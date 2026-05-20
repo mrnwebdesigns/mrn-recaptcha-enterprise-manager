@@ -14,6 +14,8 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	const SETTINGS_GROUP           = 'mrn_recaptcha_enterprise_manager';
 	const CREATE_KEY_ACTION        = 'mrn_recaptcha_enterprise_create_key';
 	const CREATE_KEY_NONCE_ACTION  = 'mrn_recaptcha_enterprise_create_key';
+	const ENABLE_FORMS_ACTION      = 'mrn_recaptcha_enterprise_enable_forms';
+	const ENABLE_FORMS_NONCE       = 'mrn_recaptcha_enterprise_enable_forms';
 	const FLASH_TRANSIENT_PREFIX   = 'mrn_recaptcha_enterprise_flash_';
 	const TOKEN_SCOPE              = 'https://www.googleapis.com/auth/cloud-platform';
 	const TOKEN_ENDPOINT           = 'https://oauth2.googleapis.com/token';
@@ -44,6 +46,8 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		add_action( 'admin_menu', array( __CLASS__, 'register_settings_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_post_' . self::CREATE_KEY_ACTION, array( __CLASS__, 'handle_create_key' ) );
+		add_action( 'admin_post_' . self::ENABLE_FORMS_ACTION, array( __CLASS__, 'handle_enable_forms' ) );
+		add_action( 'wpforms_create_form', array( __CLASS__, 'maybe_enable_recaptcha_for_new_form' ), 20, 3 );
 	}
 
 	/**
@@ -90,6 +94,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			'service_account_private_key_encrypted' => '',
 			'default_allowed_domains'               => '',
 			'default_integration_type'              => self::INTEGRATION_TYPE_SCORE,
+			'auto_enable_wpforms_recaptcha'         => '1',
 		);
 	}
 
@@ -225,6 +230,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$service_account_email = sanitize_email( (string) ( $input['service_account_email'] ?? '' ) );
 		$domains               = self::sanitize_domain_list( (string) ( $input['default_allowed_domains'] ?? '' ) );
 		$integration_type      = self::sanitize_integration_type( (string) ( $input['default_integration_type'] ?? '' ) );
+		$auto_enable_forms     = ! empty( $input['auto_enable_wpforms_recaptcha'] ) ? '1' : '0';
 		$encrypted_private_key = (string) $existing['service_account_private_key_encrypted'];
 
 		$private_key_raw = isset( $input['service_account_private_key'] ) ? (string) $input['service_account_private_key'] : '';
@@ -333,6 +339,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$sanitized['service_account_private_key_encrypted'] = $encrypted_private_key;
 		$sanitized['default_allowed_domains']               = implode( ', ', $domains );
 		$sanitized['default_integration_type']              = $integration_type;
+		$sanitized['auto_enable_wpforms_recaptcha']         = $auto_enable_forms;
 
 		return $sanitized;
 	}
@@ -523,6 +530,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$code_locked_mode    = in_array( true, $locked_fields, true );
 		$active_tab          = self::get_active_tab_from_request();
 		$has_sticky_toolbar  = function_exists( 'mrn_sticky_toolbar_render' ) && function_exists( 'mrn_sticky_toolbar_render_css' );
+		$auto_enable_forms   = '1' === (string) ( $settings['auto_enable_wpforms_recaptcha'] ?? '1' );
 		?>
 		<div class="wrap mrn-recaptcha-enterprise-wrap">
 			<?php self::render_tabbed_toolbar( $active_tab ); ?>
@@ -622,6 +630,16 @@ final class MRN_Recaptcha_Enterprise_Manager {
 									</select>
 								</td>
 							</tr>
+							<tr>
+								<th scope="row"><?php echo esc_html__( 'WPForms Form Toggle Default', 'mrn-recaptcha-enterprise-manager' ); ?></th>
+								<td>
+									<label>
+										<input type="checkbox" name="<?php echo esc_attr( self::OPTION_KEY ); ?>[auto_enable_wpforms_recaptcha]" value="1" <?php checked( true, $auto_enable_forms ); ?> />
+										<?php echo esc_html__( 'Automatically enable Google reCAPTCHA on newly created WPForms forms', 'mrn-recaptcha-enterprise-manager' ); ?>
+									</label>
+									<p class="description"><?php echo esc_html__( 'This only runs when WPForms reCAPTCHA keys already exist in WPForms settings.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+								</td>
+							</tr>
 						</tbody>
 					</table>
 
@@ -647,6 +665,9 @@ final class MRN_Recaptcha_Enterprise_Manager {
 						<?php endif; ?>
 						<?php if ( ! empty( $flash['wpforms_message'] ) ) : ?>
 							<p><strong><?php echo esc_html__( 'WPForms:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <?php echo esc_html( $flash['wpforms_message'] ); ?></p>
+						<?php endif; ?>
+						<?php if ( ! empty( $flash['wpforms_forms_message'] ) ) : ?>
+							<p><strong><?php echo esc_html__( 'WPForms Forms:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <?php echo esc_html( $flash['wpforms_forms_message'] ); ?></p>
 						<?php endif; ?>
 					</div>
 				<?php endif; ?>
@@ -697,6 +718,11 @@ final class MRN_Recaptcha_Enterprise_Manager {
 												<input type="checkbox" name="apply_to_wpforms" value="1" checked />
 												<?php echo esc_html__( 'Apply generated site key + legacy secret to WPForms CAPTCHA settings', 'mrn-recaptcha-enterprise-manager' ); ?>
 											</label>
+											<br />
+											<label>
+												<input type="checkbox" name="enable_existing_wpforms_forms" value="1" checked />
+												<?php echo esc_html__( 'Also enable reCAPTCHA on all existing WPForms forms now', 'mrn-recaptcha-enterprise-manager' ); ?>
+											</label>
 										</td>
 									</tr>
 								</tbody>
@@ -705,6 +731,16 @@ final class MRN_Recaptcha_Enterprise_Manager {
 							<?php submit_button( __( 'Create Key and Retrieve Legacy Secret', 'mrn-recaptcha-enterprise-manager' ), 'primary', 'submit', false ); ?>
 						</form>
 					<?php endif; ?>
+				</div>
+
+				<div class="card" style="max-width:980px;padding:16px 20px;margin-top:16px;">
+					<h2 style="margin-top:0;"><?php echo esc_html__( 'WPForms Existing Forms', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
+					<p><?php echo esc_html__( 'Run this when you need to turn on the form-level reCAPTCHA toggle for forms already on the site.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<input type="hidden" name="action" value="<?php echo esc_attr( self::ENABLE_FORMS_ACTION ); ?>" />
+						<?php wp_nonce_field( self::ENABLE_FORMS_NONCE ); ?>
+						<?php submit_button( __( 'Enable reCAPTCHA on Existing WPForms', 'mrn-recaptcha-enterprise-manager' ), 'secondary', 'submit', false ); ?>
+					</form>
 				</div>
 			</div>
 		</div>
@@ -817,10 +853,15 @@ final class MRN_Recaptcha_Enterprise_Manager {
 
 		$legacy_secret = (string) $secret_response['legacy_secret_key'];
 		$wpforms_note  = '';
+		$forms_note    = '';
 
 		if ( ! empty( $_POST['apply_to_wpforms'] ) ) {
 			$wpforms_apply = self::apply_to_wpforms_settings( $site_key, $legacy_secret, $integration_type );
 			$wpforms_note  = (string) $wpforms_apply['message'];
+
+			if ( ! empty( $_POST['enable_existing_wpforms_forms'] ) ) {
+				$forms_note = self::enable_recaptcha_for_existing_wpforms_forms_message();
+			}
 		}
 
 		self::set_flash_notice(
@@ -831,6 +872,31 @@ final class MRN_Recaptcha_Enterprise_Manager {
 				'site_key'          => $site_key,
 				'legacy_secret_key' => $legacy_secret,
 				'wpforms_message'   => $wpforms_note,
+				'wpforms_forms_message' => $forms_note,
+			)
+		);
+
+		self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
+	}
+
+	/**
+	 * Handle bulk enable request for existing WPForms.
+	 *
+	 * @return void
+	 */
+	public static function handle_enable_forms() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You are not allowed to perform this action.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+
+		check_admin_referer( self::ENABLE_FORMS_NONCE );
+
+		$message = self::enable_recaptcha_for_existing_wpforms_forms_message();
+		self::set_flash_notice(
+			array(
+				'type'                 => 'success',
+				'message'              => __( 'WPForms form-level reCAPTCHA update completed.', 'mrn-recaptcha-enterprise-manager' ),
+				'wpforms_forms_message' => $message,
 			)
 		);
 
@@ -999,6 +1065,200 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			'success' => true,
 			'message' => __( 'CAPTCHA provider, site key, secret key, and reCAPTCHA type were synced to WPForms settings.', 'mrn-recaptcha-enterprise-manager' ),
 		);
+	}
+
+	/**
+	 * Maybe enable recaptcha toggle when a new WPForms form is created.
+	 *
+	 * @param int   $form_id Form ID.
+	 * @param array $form Form post array.
+	 * @param array $data Create context.
+	 * @return void
+	 */
+	public static function maybe_enable_recaptcha_for_new_form( $form_id, $form = array(), $data = array() ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+		$form_id = absint( $form_id );
+		if ( $form_id <= 0 ) {
+			return;
+		}
+
+		if ( ! function_exists( 'wpforms' ) ) {
+			return;
+		}
+
+		$settings = self::get_settings();
+		if ( '1' !== (string) ( $settings['auto_enable_wpforms_recaptcha'] ?? '1' ) ) {
+			return;
+		}
+
+		if ( ! self::has_wpforms_recaptcha_credentials() ) {
+			return;
+		}
+
+		self::enable_recaptcha_on_wpforms_forms( array( $form_id ) );
+	}
+
+	/**
+	 * Enable recaptcha for all existing WPForms and return summary.
+	 *
+	 * @return string
+	 */
+	private static function enable_recaptcha_for_existing_wpforms_forms_message() {
+		if ( ! function_exists( 'wpforms' ) ) {
+			return __( 'WPForms is not active, so existing forms were not updated.', 'mrn-recaptcha-enterprise-manager' );
+		}
+
+		if ( ! self::has_wpforms_recaptcha_credentials() ) {
+			return __( 'WPForms reCAPTCHA keys are missing. Sync or set keys first, then run this again.', 'mrn-recaptcha-enterprise-manager' );
+		}
+
+		$form_ids = self::get_wpforms_form_ids();
+		$summary  = self::enable_recaptcha_on_wpforms_forms( $form_ids );
+
+		if ( 0 === $summary['total'] ) {
+			return __( 'No WPForms were found to update.', 'mrn-recaptcha-enterprise-manager' );
+		}
+
+		return sprintf(
+			/* translators: %1$d updated, %2$d already enabled, %3$d failed. */
+			__( 'Updated %1$d form(s), %2$d already enabled, %3$d failed.', 'mrn-recaptcha-enterprise-manager' ),
+			$summary['updated'],
+			$summary['already_enabled'],
+			$summary['failed']
+		);
+	}
+
+	/**
+	 * Fetch WPForms post IDs.
+	 *
+	 * @return int[]
+	 */
+	private static function get_wpforms_form_ids() {
+		$form_ids = get_posts(
+			array(
+				'post_type'              => 'wpforms',
+				'post_status'            => array( 'publish', 'draft', 'pending', 'private' ),
+				'posts_per_page'         => -1,
+				'fields'                 => 'ids',
+				'orderby'                => 'ID',
+				'order'                  => 'ASC',
+				'suppress_filters'       => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			)
+		);
+
+		if ( ! is_array( $form_ids ) ) {
+			return array();
+		}
+
+		return array_values( array_filter( array_map( 'absint', $form_ids ) ) );
+	}
+
+	/**
+	 * Enable recaptcha setting on supplied WPForms IDs.
+	 *
+	 * @param int[] $form_ids Form IDs.
+	 * @return array<string, int>
+	 */
+	private static function enable_recaptcha_on_wpforms_forms( $form_ids ) {
+		$summary = array(
+			'total'           => 0,
+			'updated'         => 0,
+			'already_enabled' => 0,
+			'failed'          => 0,
+		);
+
+		if ( ! function_exists( 'wpforms' ) ) {
+			return $summary;
+		}
+
+		foreach ( $form_ids as $form_id ) {
+			$form_id = absint( $form_id );
+			if ( $form_id <= 0 ) {
+				continue;
+			}
+
+			$summary['total']++;
+
+			$result = self::enable_recaptcha_on_wpforms_form( $form_id );
+			if ( true === $result ) {
+				$summary['updated']++;
+				continue;
+			}
+
+			if ( false === $result ) {
+				$summary['already_enabled']++;
+				continue;
+			}
+
+			$summary['failed']++;
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Enable recaptcha setting for a single WPForms form.
+	 *
+	 * @param int $form_id Form ID.
+	 * @return bool|WP_Error True when updated, false when already enabled.
+	 */
+	private static function enable_recaptcha_on_wpforms_form( $form_id ) {
+		$form_handler = wpforms()->obj( 'form' );
+		if ( ! is_object( $form_handler ) || ! method_exists( $form_handler, 'get' ) || ! method_exists( $form_handler, 'update' ) ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_form_handler_missing', __( 'WPForms form handler is unavailable.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+
+		$form_data = $form_handler->get(
+			$form_id,
+			array(
+				'content_only' => true,
+				'cap'          => false,
+			)
+		);
+
+		if ( ! is_array( $form_data ) ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_form_missing', __( 'WPForms form data could not be loaded.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+
+		if ( ! isset( $form_data['settings'] ) || ! is_array( $form_data['settings'] ) ) {
+			$form_data['settings'] = array();
+		}
+
+		if ( '1' === (string) ( $form_data['settings']['recaptcha'] ?? '' ) ) {
+			return false;
+		}
+
+		$form_data['settings']['recaptcha'] = '1';
+		$form_data['id']                    = $form_id;
+
+		$updated = $form_handler->update(
+			$form_id,
+			$form_data,
+			array(
+				'cap'           => false,
+				'skip_revision' => true,
+			)
+		);
+
+		if ( false === $updated ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_update_failed', __( 'WPForms form update failed.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Return true when WPForms has recaptcha keys configured.
+	 *
+	 * @return bool
+	 */
+	private static function has_wpforms_recaptcha_credentials() {
+		$wpforms_settings = get_option( 'wpforms_settings', array() );
+		$wpforms_settings = is_array( $wpforms_settings ) ? $wpforms_settings : array();
+
+		return '' !== trim( (string) ( $wpforms_settings['recaptcha-site-key'] ?? '' ) )
+			&& '' !== trim( (string) ( $wpforms_settings['recaptcha-secret-key'] ?? '' ) );
 	}
 
 	/**
