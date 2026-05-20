@@ -8,6 +8,7 @@ Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally s
 - Creates reCAPTCHA Enterprise website keys via Google API.
 - Retrieves the key's legacy secret key for third-party compatibility.
 - Optionally syncs the generated site key + legacy secret key to WPForms global CAPTCHA settings.
+- Uses a tabbed admin screen (`Credentials` and `Create Key`) with optional MRN sticky toolbar support when available.
 
 ## Requirements
 

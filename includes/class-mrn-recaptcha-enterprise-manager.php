@@ -25,6 +25,9 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	const CONFIG_PRIVATE_KEY       = 'MRN_RECAPTCHA_ENTERPRISE_PRIVATE_KEY';
 	const CONFIG_ALLOWED_DOMAINS   = 'MRN_RECAPTCHA_ENTERPRISE_ALLOWED_DOMAINS';
 	const CONFIG_INTEGRATION_TYPE  = 'MRN_RECAPTCHA_ENTERPRISE_DEFAULT_INTEGRATION_TYPE';
+	const TAB_QUERY_ARG            = 'tab';
+	const TAB_CREDENTIALS          = 'credentials';
+	const TAB_CREATE_KEY           = 'create-key';
 
 	/**
 	 * Register plugin hooks.
@@ -35,6 +38,8 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		if ( ! is_admin() ) {
 			return;
 		}
+
+		self::maybe_load_sticky_toolbar_helper();
 
 		add_action( 'admin_menu', array( __CLASS__, 'register_settings_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
@@ -333,6 +338,171 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	}
 
 	/**
+	 * Load the shared sticky toolbar helper when available.
+	 *
+	 * @return void
+	 */
+	private static function maybe_load_sticky_toolbar_helper() {
+		$local_toolbar_helper = dirname( __FILE__ ) . '/mrn-sticky-settings-toolbar.php';
+		if ( file_exists( $local_toolbar_helper ) ) {
+			require_once $local_toolbar_helper;
+		}
+	}
+
+	/**
+	 * Resolve the active admin tab.
+	 *
+	 * @return string
+	 */
+	private static function get_active_tab_from_request() {
+		$tab = filter_input( INPUT_GET, self::TAB_QUERY_ARG, FILTER_UNSAFE_RAW );
+		$tab = sanitize_key( is_string( $tab ) ? wp_unslash( $tab ) : '' );
+
+		if ( self::TAB_CREATE_KEY === $tab ) {
+			return self::TAB_CREATE_KEY;
+		}
+
+		return self::TAB_CREDENTIALS;
+	}
+
+	/**
+	 * Render fallback tab navigation.
+	 *
+	 * @param string $active_tab Active tab key.
+	 * @return void
+	 */
+	private static function render_tab_navigation( $active_tab ) {
+		$credentials_url = self::get_settings_page_url( self::TAB_CREDENTIALS );
+		$key_create_url  = self::get_settings_page_url( self::TAB_CREATE_KEY );
+		?>
+		<h2 class="nav-tab-wrapper" role="tablist" aria-label="<?php echo esc_attr__( 'reCAPTCHA Enterprise tabs', 'mrn-recaptcha-enterprise-manager' ); ?>">
+			<a href="<?php echo esc_url( $credentials_url ); ?>" class="nav-tab<?php echo self::TAB_CREDENTIALS === $active_tab ? ' nav-tab-active' : ''; ?>" role="tab" aria-selected="<?php echo self::TAB_CREDENTIALS === $active_tab ? 'true' : 'false'; ?>">
+				<?php echo esc_html__( 'Credentials', 'mrn-recaptcha-enterprise-manager' ); ?>
+			</a>
+			<a href="<?php echo esc_url( $key_create_url ); ?>" class="nav-tab<?php echo self::TAB_CREATE_KEY === $active_tab ? ' nav-tab-active' : ''; ?>" role="tab" aria-selected="<?php echo self::TAB_CREATE_KEY === $active_tab ? 'true' : 'false'; ?>">
+				<?php echo esc_html__( 'Create Key', 'mrn-recaptcha-enterprise-manager' ); ?>
+			</a>
+		</h2>
+		<?php
+	}
+
+	/**
+	 * Render optional sticky tab toolbar when helper is available.
+	 *
+	 * @param string $active_tab Active tab key.
+	 * @return void
+	 */
+	private static function render_tabbed_toolbar( $active_tab ) {
+		if ( ! function_exists( 'mrn_sticky_toolbar_render' ) ) {
+			return;
+		}
+
+		mrn_sticky_toolbar_render(
+			array(
+				'toolbar_id' => 'mrn-recaptcha-enterprise-toolbar',
+				'form_id'    => 'mrn-recaptcha-credentials-form',
+				'title'      => 'reCAPTCHA Enterprise',
+				'save_label' => 'Save Credentials',
+				'aria_label' => 'reCAPTCHA Enterprise tabs',
+				'tabs'       => array(
+					array(
+						'key'    => self::TAB_CREDENTIALS,
+						'label'  => 'Credentials',
+						'active' => self::TAB_CREDENTIALS === $active_tab,
+					),
+					array(
+						'key'    => self::TAB_CREATE_KEY,
+						'label'  => 'Create Key',
+						'active' => self::TAB_CREATE_KEY === $active_tab,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Render styles/scripts for tabs and sticky toolbar behavior.
+	 *
+	 * @param string $active_tab Active tab key.
+	 * @param bool   $has_sticky_toolbar Whether sticky toolbar helper is loaded.
+	 * @return void
+	 */
+	private static function render_tabbed_ui_script( $active_tab, $has_sticky_toolbar ) {
+		$credentials_url = self::get_settings_page_url( self::TAB_CREDENTIALS );
+		$key_create_url  = self::get_settings_page_url( self::TAB_CREATE_KEY );
+		?>
+		<?php if ( function_exists( 'mrn_sticky_toolbar_universal_css' ) ) : ?>
+			<style>
+				<?php echo mrn_sticky_toolbar_universal_css(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</style>
+		<?php endif; ?>
+		<?php
+		if ( function_exists( 'mrn_sticky_toolbar_render_css' ) ) {
+			mrn_sticky_toolbar_render_css(
+				array(
+					'toolbar_id'            => 'mrn-recaptcha-enterprise-toolbar',
+					'page_class'            => 'settings_page_' . self::PAGE_SLUG,
+					'desktop_left'          => 196,
+					'desktop_right'         => 0,
+					'mobile_left'           => 10,
+					'mobile_right'          => 10,
+					'spacer_height'         => 88,
+					'spacer_height_mobile'  => 120,
+				)
+			);
+		}
+		?>
+		<style>
+			.mrn-recaptcha-panel[hidden] {
+				display: none !important;
+			}
+			<?php if ( ! $has_sticky_toolbar ) : ?>
+			.mrn-recaptcha-enterprise-wrap .nav-tab-wrapper {
+				margin: 14px 0 16px;
+			}
+			<?php endif; ?>
+		</style>
+		<script>
+			(function () {
+				var toolbar = document.getElementById('mrn-recaptcha-enterprise-toolbar');
+				if (!toolbar || toolbar.dataset.mrnRecaptchaTabsInit === '1') {
+					return;
+				}
+
+				toolbar.dataset.mrnRecaptchaTabsInit = '1';
+
+				var saveButton = toolbar.querySelector('.mrn-settings-tab--save');
+				var activeTab = <?php echo wp_json_encode( $active_tab ); ?>;
+				var urls = {
+					credentials: <?php echo wp_json_encode( $credentials_url ); ?>,
+					'create-key': <?php echo wp_json_encode( $key_create_url ); ?>
+				};
+
+				function syncSaveButton(tabKey) {
+					if (!saveButton) {
+						return;
+					}
+
+					saveButton.hidden = tabKey !== 'credentials';
+				}
+
+				Array.prototype.slice.call(toolbar.querySelectorAll('[data-mrn-tab]')).forEach(function (button) {
+					button.addEventListener('click', function (event) {
+						event.preventDefault();
+						var tabKey = button.getAttribute('data-mrn-tab') || 'credentials';
+						if (urls[tabKey]) {
+							window.location.href = urls[tabKey];
+						}
+					});
+				});
+
+				syncSaveButton(activeTab);
+			})();
+		</script>
+		<?php
+	}
+
+	/**
 	 * Render settings page.
 	 *
 	 * @return void
@@ -351,8 +521,11 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$has_private_key     = '' !== trim( $runtime_private_key );
 		$locked_fields       = self::get_locked_credential_fields();
 		$code_locked_mode    = in_array( true, $locked_fields, true );
+		$active_tab          = self::get_active_tab_from_request();
+		$has_sticky_toolbar  = function_exists( 'mrn_sticky_toolbar_render' ) && function_exists( 'mrn_sticky_toolbar_render_css' );
 		?>
-		<div class="wrap">
+		<div class="wrap mrn-recaptcha-enterprise-wrap">
+			<?php self::render_tabbed_toolbar( $active_tab ); ?>
 			<h1><?php echo esc_html__( 'reCAPTCHA Enterprise Manager', 'mrn-recaptcha-enterprise-manager' ); ?></h1>
 			<p><?php echo esc_html__( 'Create reCAPTCHA Enterprise keys and optionally sync them to WPForms without leaving WordPress.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
 
@@ -370,25 +543,12 @@ final class MRN_Recaptcha_Enterprise_Manager {
 				</div>
 			<?php endif; ?>
 
-			<?php if ( ! empty( $flash['site_key'] ) || ! empty( $flash['legacy_secret_key'] ) ) : ?>
-				<div class="card" style="max-width:980px;padding:16px 20px;">
-					<h2 style="margin-top:0;"><?php echo esc_html__( 'Last Generated Key', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
-					<?php if ( ! empty( $flash['key_resource_name'] ) ) : ?>
-						<p><strong><?php echo esc_html__( 'Google Key Resource:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['key_resource_name'] ); ?></code></p>
-					<?php endif; ?>
-					<?php if ( ! empty( $flash['site_key'] ) ) : ?>
-						<p><strong><?php echo esc_html__( 'Site Key:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['site_key'] ); ?></code></p>
-					<?php endif; ?>
-					<?php if ( ! empty( $flash['legacy_secret_key'] ) ) : ?>
-						<p><strong><?php echo esc_html__( 'Legacy Secret Key:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['legacy_secret_key'] ); ?></code></p>
-					<?php endif; ?>
-					<?php if ( ! empty( $flash['wpforms_message'] ) ) : ?>
-						<p><strong><?php echo esc_html__( 'WPForms:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <?php echo esc_html( $flash['wpforms_message'] ); ?></p>
-					<?php endif; ?>
-				</div>
+			<?php if ( ! $has_sticky_toolbar ) : ?>
+				<?php self::render_tab_navigation( $active_tab ); ?>
 			<?php endif; ?>
 
-			<form method="post" action="options.php" style="max-width:980px;">
+			<div class="mrn-recaptcha-panel" data-mrn-recaptcha-panel="<?php echo esc_attr( self::TAB_CREDENTIALS ); ?>"<?php echo self::TAB_CREDENTIALS === $active_tab ? '' : ' hidden'; ?>>
+				<form id="mrn-recaptcha-credentials-form" method="post" action="options.php" style="max-width:980px;">
 				<?php settings_fields( self::SETTINGS_GROUP ); ?>
 
 				<div class="card" style="padding:16px 20px;">
@@ -465,66 +625,90 @@ final class MRN_Recaptcha_Enterprise_Manager {
 						</tbody>
 					</table>
 
-					<?php submit_button( __( 'Save Credentials', 'mrn-recaptcha-enterprise-manager' ) ); ?>
+					<?php if ( ! $has_sticky_toolbar ) : ?>
+						<?php submit_button( __( 'Save Credentials', 'mrn-recaptcha-enterprise-manager' ) ); ?>
+					<?php endif; ?>
 				</div>
-			</form>
+				</form>
+			</div>
 
-			<div class="card" style="max-width:980px;padding:16px 20px;margin-top:16px;">
-				<h2 style="margin-top:0;"><?php echo esc_html__( 'Create reCAPTCHA Enterprise Key', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
-				<?php if ( ! $credentials_ready ) : ?>
-					<p><?php echo esc_html__( 'Save valid Google project credentials first to enable key creation.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
-				<?php else : ?>
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-						<input type="hidden" name="action" value="<?php echo esc_attr( self::CREATE_KEY_ACTION ); ?>" />
-						<?php wp_nonce_field( self::CREATE_KEY_NONCE_ACTION ); ?>
-
-						<table class="form-table" role="presentation">
-							<tbody>
-								<tr>
-									<th scope="row">
-										<label for="mrn-recaptcha-key-display-name"><?php echo esc_html__( 'Key Display Name', 'mrn-recaptcha-enterprise-manager' ); ?></label>
-									</th>
-									<td>
-										<input type="text" id="mrn-recaptcha-key-display-name" class="regular-text" name="display_name" value="<?php echo esc_attr( 'WPForms ' . ( is_string( $home_host ) ? $home_host : 'Website' ) ); ?>" required />
-									</td>
-								</tr>
-								<tr>
-									<th scope="row">
-										<label for="mrn-recaptcha-key-domains"><?php echo esc_html__( 'Allowed Domains', 'mrn-recaptcha-enterprise-manager' ); ?></label>
-									</th>
-									<td>
-										<input type="text" id="mrn-recaptcha-key-domains" class="regular-text" name="allowed_domains" value="<?php echo esc_attr( $default_domains ); ?>" required />
-										<p class="description"><?php echo esc_html__( 'Hosts only. Do not include protocol, path, or port.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row">
-										<label for="mrn-recaptcha-key-integration"><?php echo esc_html__( 'Integration Type', 'mrn-recaptcha-enterprise-manager' ); ?></label>
-									</th>
-									<td>
-										<select id="mrn-recaptcha-key-integration" name="integration_type">
-											<option value="<?php echo esc_attr( self::INTEGRATION_TYPE_SCORE ); ?>" <?php selected( self::INTEGRATION_TYPE_SCORE, (string) $settings['default_integration_type'] ); ?>><?php echo esc_html__( 'Score-based (recommended)', 'mrn-recaptcha-enterprise-manager' ); ?></option>
-											<option value="<?php echo esc_attr( self::INTEGRATION_TYPE_CHECKBX ); ?>" <?php selected( self::INTEGRATION_TYPE_CHECKBX, (string) $settings['default_integration_type'] ); ?>><?php echo esc_html__( 'Checkbox challenge', 'mrn-recaptcha-enterprise-manager' ); ?></option>
-										</select>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row"><?php echo esc_html__( 'WPForms Sync', 'mrn-recaptcha-enterprise-manager' ); ?></th>
-									<td>
-										<label>
-											<input type="checkbox" name="apply_to_wpforms" value="1" checked />
-											<?php echo esc_html__( 'Apply generated site key + legacy secret to WPForms CAPTCHA settings', 'mrn-recaptcha-enterprise-manager' ); ?>
-										</label>
-									</td>
-								</tr>
-							</tbody>
-						</table>
-
-						<?php submit_button( __( 'Create Key and Retrieve Legacy Secret', 'mrn-recaptcha-enterprise-manager' ), 'primary', 'submit', false ); ?>
-					</form>
+			<div class="mrn-recaptcha-panel" data-mrn-recaptcha-panel="<?php echo esc_attr( self::TAB_CREATE_KEY ); ?>"<?php echo self::TAB_CREATE_KEY === $active_tab ? '' : ' hidden'; ?>>
+				<?php if ( ! empty( $flash['site_key'] ) || ! empty( $flash['legacy_secret_key'] ) ) : ?>
+					<div class="card" style="max-width:980px;padding:16px 20px;">
+						<h2 style="margin-top:0;"><?php echo esc_html__( 'Last Generated Key', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
+						<?php if ( ! empty( $flash['key_resource_name'] ) ) : ?>
+							<p><strong><?php echo esc_html__( 'Google Key Resource:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['key_resource_name'] ); ?></code></p>
+						<?php endif; ?>
+						<?php if ( ! empty( $flash['site_key'] ) ) : ?>
+							<p><strong><?php echo esc_html__( 'Site Key:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['site_key'] ); ?></code></p>
+						<?php endif; ?>
+						<?php if ( ! empty( $flash['legacy_secret_key'] ) ) : ?>
+							<p><strong><?php echo esc_html__( 'Legacy Secret Key:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <code><?php echo esc_html( $flash['legacy_secret_key'] ); ?></code></p>
+						<?php endif; ?>
+						<?php if ( ! empty( $flash['wpforms_message'] ) ) : ?>
+							<p><strong><?php echo esc_html__( 'WPForms:', 'mrn-recaptcha-enterprise-manager' ); ?></strong> <?php echo esc_html( $flash['wpforms_message'] ); ?></p>
+						<?php endif; ?>
+					</div>
 				<?php endif; ?>
+
+				<div class="card" style="max-width:980px;padding:16px 20px;margin-top:16px;">
+					<h2 style="margin-top:0;"><?php echo esc_html__( 'Create reCAPTCHA Enterprise Key', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
+					<?php if ( ! $credentials_ready ) : ?>
+						<p><?php echo esc_html__( 'Save valid Google project credentials first to enable key creation.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+					<?php else : ?>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="<?php echo esc_attr( self::CREATE_KEY_ACTION ); ?>" />
+							<?php wp_nonce_field( self::CREATE_KEY_NONCE_ACTION ); ?>
+
+							<table class="form-table" role="presentation">
+								<tbody>
+									<tr>
+										<th scope="row">
+											<label for="mrn-recaptcha-key-display-name"><?php echo esc_html__( 'Key Display Name', 'mrn-recaptcha-enterprise-manager' ); ?></label>
+										</th>
+										<td>
+											<input type="text" id="mrn-recaptcha-key-display-name" class="regular-text" name="display_name" value="<?php echo esc_attr( 'WPForms ' . ( is_string( $home_host ) ? $home_host : 'Website' ) ); ?>" required />
+										</td>
+									</tr>
+									<tr>
+										<th scope="row">
+											<label for="mrn-recaptcha-key-domains"><?php echo esc_html__( 'Allowed Domains', 'mrn-recaptcha-enterprise-manager' ); ?></label>
+										</th>
+										<td>
+											<input type="text" id="mrn-recaptcha-key-domains" class="regular-text" name="allowed_domains" value="<?php echo esc_attr( $default_domains ); ?>" required />
+											<p class="description"><?php echo esc_html__( 'Hosts only. Do not include protocol, path, or port.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+										</td>
+									</tr>
+									<tr>
+										<th scope="row">
+											<label for="mrn-recaptcha-key-integration"><?php echo esc_html__( 'Integration Type', 'mrn-recaptcha-enterprise-manager' ); ?></label>
+										</th>
+										<td>
+											<select id="mrn-recaptcha-key-integration" name="integration_type">
+												<option value="<?php echo esc_attr( self::INTEGRATION_TYPE_SCORE ); ?>" <?php selected( self::INTEGRATION_TYPE_SCORE, (string) $settings['default_integration_type'] ); ?>><?php echo esc_html__( 'Score-based (recommended)', 'mrn-recaptcha-enterprise-manager' ); ?></option>
+												<option value="<?php echo esc_attr( self::INTEGRATION_TYPE_CHECKBX ); ?>" <?php selected( self::INTEGRATION_TYPE_CHECKBX, (string) $settings['default_integration_type'] ); ?>><?php echo esc_html__( 'Checkbox challenge', 'mrn-recaptcha-enterprise-manager' ); ?></option>
+											</select>
+										</td>
+									</tr>
+									<tr>
+										<th scope="row"><?php echo esc_html__( 'WPForms Sync', 'mrn-recaptcha-enterprise-manager' ); ?></th>
+										<td>
+											<label>
+												<input type="checkbox" name="apply_to_wpforms" value="1" checked />
+												<?php echo esc_html__( 'Apply generated site key + legacy secret to WPForms CAPTCHA settings', 'mrn-recaptcha-enterprise-manager' ); ?>
+											</label>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+
+							<?php submit_button( __( 'Create Key and Retrieve Legacy Secret', 'mrn-recaptcha-enterprise-manager' ), 'primary', 'submit', false ); ?>
+						</form>
+					<?php endif; ?>
+				</div>
 			</div>
 		</div>
+		<?php self::render_tabbed_ui_script( $active_tab, $has_sticky_toolbar ); ?>
 		<?php
 	}
 
@@ -548,7 +732,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					'message' => __( 'Missing credentials. Save project ID, service account email, and private key first.', 'mrn-recaptcha-enterprise-manager' ),
 				)
 			);
-			self::safe_redirect_to_settings();
+			self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 		}
 
 		$project_id    = (string) $settings['project_id'];
@@ -561,7 +745,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					'message' => __( 'Stored private key is missing or unreadable. Save it again and retry.', 'mrn-recaptcha-enterprise-manager' ),
 				)
 			);
-			self::safe_redirect_to_settings();
+			self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 		}
 
 		$display_name = isset( $_POST['display_name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['display_name'] ) ) : '';
@@ -592,7 +776,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					),
 				)
 			);
-			self::safe_redirect_to_settings();
+			self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 		}
 
 		$access_token = (string) $token_response['access_token'];
@@ -608,7 +792,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					),
 				)
 			);
-			self::safe_redirect_to_settings();
+			self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 		}
 
 		$key_resource_name = (string) $key_response['key_resource_name'];
@@ -628,7 +812,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					'site_key'          => $site_key,
 				)
 			);
-			self::safe_redirect_to_settings();
+			self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 		}
 
 		$legacy_secret = (string) $secret_response['legacy_secret_key'];
@@ -650,7 +834,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			)
 		);
 
-		self::safe_redirect_to_settings();
+		self::safe_redirect_to_settings( self::TAB_CREATE_KEY );
 	}
 
 	/**
@@ -934,20 +1118,29 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	/**
 	 * Redirect back to plugin settings page.
 	 *
+	 * @param string $tab Optional target tab key.
 	 * @return void
 	 */
-	private static function safe_redirect_to_settings() {
-		wp_safe_redirect( self::get_settings_page_url() );
+	private static function safe_redirect_to_settings( $tab = '' ) {
+		wp_safe_redirect( self::get_settings_page_url( $tab ) );
 		exit;
 	}
 
 	/**
 	 * Return settings page URL.
 	 *
+	 * @param string $tab Optional tab key.
 	 * @return string
 	 */
-	private static function get_settings_page_url() {
-		return admin_url( 'options-general.php?page=' . self::PAGE_SLUG );
+	private static function get_settings_page_url( $tab = '' ) {
+		$base_url = admin_url( 'options-general.php?page=' . self::PAGE_SLUG );
+		$tab      = sanitize_key( (string) $tab );
+
+		if ( self::TAB_CREDENTIALS === $tab || self::TAB_CREATE_KEY === $tab ) {
+			return add_query_arg( self::TAB_QUERY_ARG, $tab, $base_url );
+		}
+
+		return $base_url;
 	}
 
 	/**
