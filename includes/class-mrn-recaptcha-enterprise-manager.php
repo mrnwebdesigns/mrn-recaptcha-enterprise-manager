@@ -358,11 +358,11 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$tab = filter_input( INPUT_GET, self::TAB_QUERY_ARG, FILTER_UNSAFE_RAW );
 		$tab = sanitize_key( is_string( $tab ) ? wp_unslash( $tab ) : '' );
 
-		if ( self::TAB_CREATE_KEY === $tab ) {
-			return self::TAB_CREATE_KEY;
+		if ( self::TAB_CREDENTIALS === $tab ) {
+			return self::TAB_CREDENTIALS;
 		}
 
-		return self::TAB_CREDENTIALS;
+		return self::TAB_CREATE_KEY;
 	}
 
 	/**
@@ -372,15 +372,15 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	 * @return void
 	 */
 	private static function render_tab_navigation( $active_tab ) {
-		$credentials_url = self::get_settings_page_url( self::TAB_CREDENTIALS );
 		$key_create_url  = self::get_settings_page_url( self::TAB_CREATE_KEY );
+		$credentials_url = self::get_settings_page_url( self::TAB_CREDENTIALS );
 		?>
 		<h2 class="nav-tab-wrapper" role="tablist" aria-label="<?php echo esc_attr__( 'reCAPTCHA Enterprise tabs', 'mrn-recaptcha-enterprise-manager' ); ?>">
-			<a href="<?php echo esc_url( $credentials_url ); ?>" class="nav-tab<?php echo self::TAB_CREDENTIALS === $active_tab ? ' nav-tab-active' : ''; ?>" role="tab" aria-selected="<?php echo self::TAB_CREDENTIALS === $active_tab ? 'true' : 'false'; ?>">
-				<?php echo esc_html__( 'Credentials', 'mrn-recaptcha-enterprise-manager' ); ?>
-			</a>
 			<a href="<?php echo esc_url( $key_create_url ); ?>" class="nav-tab<?php echo self::TAB_CREATE_KEY === $active_tab ? ' nav-tab-active' : ''; ?>" role="tab" aria-selected="<?php echo self::TAB_CREATE_KEY === $active_tab ? 'true' : 'false'; ?>">
 				<?php echo esc_html__( 'Create Key', 'mrn-recaptcha-enterprise-manager' ); ?>
+			</a>
+			<a href="<?php echo esc_url( $credentials_url ); ?>" class="nav-tab<?php echo self::TAB_CREDENTIALS === $active_tab ? ' nav-tab-active' : ''; ?>" role="tab" aria-selected="<?php echo self::TAB_CREDENTIALS === $active_tab ? 'true' : 'false'; ?>">
+				<?php echo esc_html__( 'Credentials', 'mrn-recaptcha-enterprise-manager' ); ?>
 			</a>
 		</h2>
 		<?php
@@ -406,14 +406,14 @@ final class MRN_Recaptcha_Enterprise_Manager {
 				'aria_label' => 'reCAPTCHA Enterprise tabs',
 				'tabs'       => array(
 					array(
-						'key'    => self::TAB_CREDENTIALS,
-						'label'  => 'Credentials',
-						'active' => self::TAB_CREDENTIALS === $active_tab,
-					),
-					array(
 						'key'    => self::TAB_CREATE_KEY,
 						'label'  => 'Create Key',
 						'active' => self::TAB_CREATE_KEY === $active_tab,
+					),
+					array(
+						'key'    => self::TAB_CREDENTIALS,
+						'label'  => 'Credentials',
+						'active' => self::TAB_CREDENTIALS === $active_tab,
 					),
 				),
 			)
