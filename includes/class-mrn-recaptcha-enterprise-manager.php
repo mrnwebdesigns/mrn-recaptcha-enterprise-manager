@@ -1204,8 +1204,8 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	 * @return bool|WP_Error True when updated, false when already enabled.
 	 */
 	private static function enable_recaptcha_on_wpforms_form( $form_id ) {
-		$form_handler = wpforms()->obj( 'form' );
-		if ( ! is_object( $form_handler ) || ! method_exists( $form_handler, 'get' ) || ! method_exists( $form_handler, 'update' ) ) {
+		$form_handler = self::get_wpforms_form_handler();
+		if ( ! is_object( $form_handler ) ) {
 			return new WP_Error( 'mrn_recaptcha_wpforms_form_handler_missing', __( 'WPForms form handler is unavailable.', 'mrn-recaptcha-enterprise-manager' ) );
 		}
 
@@ -1246,6 +1246,29 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Resolve WPForms form handler object safely.
+	 *
+	 * @return object|null
+	 */
+	private static function get_wpforms_form_handler() {
+		if ( ! function_exists( 'wpforms' ) ) {
+			return null;
+		}
+
+		$wpforms_root = call_user_func( 'wpforms' );
+		if ( ! is_object( $wpforms_root ) || ! method_exists( $wpforms_root, 'obj' ) ) {
+			return null;
+		}
+
+		$form_handler = $wpforms_root->obj( 'form' );
+		if ( ! is_object( $form_handler ) || ! method_exists( $form_handler, 'get' ) || ! method_exists( $form_handler, 'update' ) ) {
+			return null;
+		}
+
+		return $form_handler;
 	}
 
 	/**
@@ -1519,6 +1542,10 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$cipher_text = substr( $decoded, 16 );
 
 		$plaintext = openssl_decrypt( $cipher_text, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+		if ( false === $plaintext ) {
+			return '';
+		}
+
 		return is_string( $plaintext ) ? $plaintext : '';
 	}
 
