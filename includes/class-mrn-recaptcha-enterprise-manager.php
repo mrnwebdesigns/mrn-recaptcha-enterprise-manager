@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class MRN_Recaptcha_Enterprise_Manager {
-	const VERSION                  = '0.1.0';
+	const VERSION                  = '0.1.1';
 	const OPTION_KEY               = 'mrn_recaptcha_enterprise_manager_settings';
 	const PAGE_SLUG                = 'mrn-recaptcha-enterprise-manager';
 	const SETTINGS_GROUP           = 'mrn_recaptcha_enterprise_manager';
@@ -212,6 +212,140 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		}
 
 		return self::decrypt_secret( (string) ( $settings['service_account_private_key_encrypted'] ?? '' ) );
+	}
+
+	/**
+	 * Return status rows for Google API credentials.
+	 *
+	 * @param array<string, string> $settings Settings array.
+	 * @param bool                  $has_private_key Whether a runtime private key is available.
+	 * @param array<string, bool>   $locked_fields Locked field map.
+	 * @return array<int, array<string, bool|string>>
+	 */
+	private static function get_google_credential_status_items( $settings, $has_private_key, $locked_fields ) {
+		$default_domains = trim( (string) ( $settings['default_allowed_domains'] ?? '' ) );
+
+		return array(
+			array(
+				'label'    => __( 'Google Project ID', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== trim( (string) ( $settings['project_id'] ?? '' ) ),
+				'required' => true,
+				'locked'   => ! empty( $locked_fields['project_id'] ),
+			),
+			array(
+				'label'    => __( 'Service Account Email', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== trim( (string) ( $settings['service_account_email'] ?? '' ) ),
+				'required' => true,
+				'locked'   => ! empty( $locked_fields['service_account_email'] ),
+			),
+			array(
+				'label'    => __( 'Service Account Private Key', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => (bool) $has_private_key,
+				'required' => true,
+				'locked'   => ! empty( $locked_fields['service_account_private_key'] ),
+			),
+			array(
+				'label'    => __( 'Default Allowed Domains', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== $default_domains,
+				'required' => false,
+				'locked'   => ! empty( $locked_fields['default_allowed_domains'] ),
+				'note'     => '' !== $default_domains ? $default_domains : __( 'Falls back to this site hostname when creating a key.', 'mrn-recaptcha-enterprise-manager' ),
+			),
+			array(
+				'label'    => __( 'Default Integration Type', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== trim( (string) ( $settings['default_integration_type'] ?? '' ) ),
+				'required' => false,
+				'locked'   => ! empty( $locked_fields['default_integration_type'] ),
+				'note'     => (string) ( $settings['default_integration_type'] ?? self::INTEGRATION_TYPE_SCORE ),
+			),
+		);
+	}
+
+	/**
+	 * Return status rows for WPForms CAPTCHA settings.
+	 *
+	 * @return array<int, array<string, bool|string>>
+	 */
+	private static function get_wpforms_recaptcha_status_items() {
+		$wpforms_settings = get_option( 'wpforms_settings', array() );
+		$wpforms_settings = is_array( $wpforms_settings ) ? $wpforms_settings : array();
+		$provider         = trim( (string) ( $wpforms_settings['captcha-provider'] ?? '' ) );
+		$recaptcha_type   = trim( (string) ( $wpforms_settings['recaptcha-type'] ?? '' ) );
+
+		return array(
+			array(
+				'label'    => __( 'CAPTCHA Provider', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => 'recaptcha' === $provider,
+				'required' => true,
+				'note'     => 'recaptcha' === $provider ? __( 'Google reCAPTCHA', 'mrn-recaptcha-enterprise-manager' ) : __( 'Not synced yet.', 'mrn-recaptcha-enterprise-manager' ),
+			),
+			array(
+				'label'    => __( 'Site Key', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== trim( (string) ( $wpforms_settings['recaptcha-site-key'] ?? '' ) ),
+				'required' => true,
+			),
+			array(
+				'label'    => __( 'Secret Key', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== trim( (string) ( $wpforms_settings['recaptcha-secret-key'] ?? '' ) ),
+				'required' => true,
+			),
+			array(
+				'label'    => __( 'reCAPTCHA Type', 'mrn-recaptcha-enterprise-manager' ),
+				'ready'    => '' !== $recaptcha_type,
+				'required' => true,
+				'note'     => '' !== $recaptcha_type ? $recaptcha_type : __( 'Not synced yet.', 'mrn-recaptcha-enterprise-manager' ),
+			),
+		);
+	}
+
+	/**
+	 * Return labels for missing required status rows.
+	 *
+	 * @param array<int, array<string, bool|string>> $items Status rows.
+	 * @return string[]
+	 */
+	private static function get_missing_required_status_labels( $items ) {
+		$missing = array();
+
+		foreach ( $items as $item ) {
+			if ( ! empty( $item['required'] ) && empty( $item['ready'] ) ) {
+				$missing[] = (string) ( $item['label'] ?? '' );
+			}
+		}
+
+		return array_values( array_filter( $missing ) );
+	}
+
+	/**
+	 * Render a compact status list.
+	 *
+	 * @param array<int, array<string, bool|string>> $items Status rows.
+	 * @return void
+	 */
+	private static function render_status_list( $items ) {
+		?>
+		<ul class="mrn-recaptcha-status-list">
+			<?php foreach ( $items as $item ) : ?>
+				<?php
+				$is_ready    = ! empty( $item['ready'] );
+				$is_required = ! empty( $item['required'] );
+				$is_locked   = ! empty( $item['locked'] );
+				$item_state  = $is_ready ? 'ready' : ( $is_required ? 'missing' : 'neutral' );
+				$status_text = $is_ready ? __( 'Configured', 'mrn-recaptcha-enterprise-manager' ) : ( $is_required ? __( 'Missing', 'mrn-recaptcha-enterprise-manager' ) : __( 'Optional', 'mrn-recaptcha-enterprise-manager' ) );
+				if ( $is_locked && $is_ready ) {
+					$status_text = __( 'Code-locked', 'mrn-recaptcha-enterprise-manager' );
+				}
+				?>
+				<li class="mrn-recaptcha-status-item mrn-recaptcha-status-item--<?php echo esc_attr( $item_state ); ?>">
+					<span class="mrn-recaptcha-status-badge"><?php echo esc_html( $status_text ); ?></span>
+					<span class="mrn-recaptcha-status-label"><?php echo esc_html( (string) ( $item['label'] ?? '' ) ); ?></span>
+					<?php if ( ! empty( $item['note'] ) ) : ?>
+						<span class="mrn-recaptcha-status-note"><?php echo esc_html( (string) $item['note'] ); ?></span>
+					<?php endif; ?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+		<?php
 	}
 
 	/**
@@ -463,11 +597,41 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			.mrn-recaptcha-panel[hidden] {
 				display: none !important;
 			}
-			<?php if ( ! $has_sticky_toolbar ) : ?>
 			.mrn-recaptcha-enterprise-wrap .nav-tab-wrapper {
 				margin: 14px 0 16px;
 			}
-			<?php endif; ?>
+			.mrn-recaptcha-status-list {
+				display: grid;
+				gap: 8px;
+				margin: 12px 0 0;
+				max-width: 820px;
+			}
+			.mrn-recaptcha-status-item {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin: 0;
+				padding: 8px 10px;
+				border-left: 4px solid #8c8f94;
+				background: #f6f7f7;
+			}
+			.mrn-recaptcha-status-item--ready {
+				border-left-color: #008a20;
+			}
+			.mrn-recaptcha-status-item--missing {
+				border-left-color: #d63638;
+			}
+			.mrn-recaptcha-status-badge {
+				min-width: 92px;
+				font-weight: 600;
+			}
+			.mrn-recaptcha-status-note {
+				color: #646970;
+			}
+			.mrn-recaptcha-missing-list {
+				margin: 8px 0 14px 18px;
+				list-style: disc;
+			}
 		</style>
 		<script>
 			(function () {
@@ -519,18 +683,22 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			return;
 		}
 
-		$settings            = self::get_settings();
-		$flash               = self::consume_flash_notice();
-		$home_host           = wp_parse_url( home_url(), PHP_URL_HOST );
-		$default_domains     = '' !== trim( (string) $settings['default_allowed_domains'] ) ? (string) $settings['default_allowed_domains'] : ( is_string( $home_host ) ? $home_host : '' );
-		$credentials_ready   = self::has_required_credentials( $settings );
-		$runtime_private_key = self::get_runtime_private_key( $settings );
-		$has_private_key     = '' !== trim( $runtime_private_key );
-		$locked_fields       = self::get_locked_credential_fields();
-		$code_locked_mode    = in_array( true, $locked_fields, true );
-		$active_tab          = self::get_active_tab_from_request();
-		$has_sticky_toolbar  = function_exists( 'mrn_sticky_toolbar_render' ) && function_exists( 'mrn_sticky_toolbar_render_css' );
-		$auto_enable_forms   = '1' === (string) ( $settings['auto_enable_wpforms_recaptcha'] ?? '1' );
+		$settings                   = self::get_settings();
+		$flash                      = self::consume_flash_notice();
+		$home_host                  = wp_parse_url( home_url(), PHP_URL_HOST );
+		$default_domains            = '' !== trim( (string) $settings['default_allowed_domains'] ) ? (string) $settings['default_allowed_domains'] : ( is_string( $home_host ) ? $home_host : '' );
+		$credentials_ready          = self::has_required_credentials( $settings );
+		$runtime_private_key        = self::get_runtime_private_key( $settings );
+		$has_private_key            = '' !== trim( $runtime_private_key );
+		$locked_fields              = self::get_locked_credential_fields();
+		$code_locked_mode           = in_array( true, $locked_fields, true );
+		$active_tab                 = self::get_active_tab_from_request();
+		$has_sticky_toolbar         = function_exists( 'mrn_sticky_toolbar_render' ) && function_exists( 'mrn_sticky_toolbar_render_css' );
+		$auto_enable_forms          = '1' === (string) ( $settings['auto_enable_wpforms_recaptcha'] ?? '1' );
+		$google_status_items        = self::get_google_credential_status_items( $settings, $has_private_key, $locked_fields );
+		$wpforms_status_items       = self::get_wpforms_recaptcha_status_items();
+		$missing_google_credentials = self::get_missing_required_status_labels( $google_status_items );
+		$wpforms_ready              = self::has_wpforms_recaptcha_credentials();
 		?>
 		<div class="wrap mrn-recaptcha-enterprise-wrap">
 			<?php self::render_tabbed_toolbar( $active_tab ); ?>
@@ -551,11 +719,30 @@ final class MRN_Recaptcha_Enterprise_Manager {
 				</div>
 			<?php endif; ?>
 
-			<?php if ( ! $has_sticky_toolbar ) : ?>
-				<?php self::render_tab_navigation( $active_tab ); ?>
-			<?php endif; ?>
+			<?php self::render_tab_navigation( $active_tab ); ?>
 
 			<div class="mrn-recaptcha-panel" data-mrn-recaptcha-panel="<?php echo esc_attr( self::TAB_CREDENTIALS ); ?>"<?php echo self::TAB_CREDENTIALS === $active_tab ? '' : ' hidden'; ?>>
+				<div class="card" style="max-width:980px;padding:16px 20px;margin-bottom:16px;">
+					<h2 style="margin-top:0;"><?php echo esc_html__( 'Setup Status', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
+					<h3><?php echo esc_html__( 'Google API Credentials', 'mrn-recaptcha-enterprise-manager' ); ?></h3>
+					<?php self::render_status_list( $google_status_items ); ?>
+					<?php if ( ! $credentials_ready ) : ?>
+						<p><?php echo esc_html__( 'Google key creation needs a project ID, service account email, and private key before the API buttons can run.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+					<?php else : ?>
+						<p>
+							<a class="button button-secondary" href="<?php echo esc_url( self::get_settings_page_url( self::TAB_CREATE_KEY ) ); ?>">
+								<?php echo esc_html__( 'Create Key via Google API', 'mrn-recaptcha-enterprise-manager' ); ?>
+							</a>
+						</p>
+					<?php endif; ?>
+
+					<h3><?php echo esc_html__( 'WPForms Sync', 'mrn-recaptcha-enterprise-manager' ); ?></h3>
+					<?php self::render_status_list( $wpforms_status_items ); ?>
+					<?php if ( ! $wpforms_ready ) : ?>
+						<p><?php echo esc_html__( 'WPForms will show keys here after a reCAPTCHA Enterprise key is created and synced from the Create Key tab.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+					<?php endif; ?>
+				</div>
+
 				<form id="mrn-recaptcha-credentials-form" method="post" action="options.php" style="max-width:980px;">
 				<?php settings_fields( self::SETTINGS_GROUP ); ?>
 
@@ -643,9 +830,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 						</tbody>
 					</table>
 
-					<?php if ( ! $has_sticky_toolbar ) : ?>
-						<?php submit_button( __( 'Save Credentials', 'mrn-recaptcha-enterprise-manager' ) ); ?>
-					<?php endif; ?>
+					<?php submit_button( __( 'Save Credentials', 'mrn-recaptcha-enterprise-manager' ) ); ?>
 				</div>
 				</form>
 			</div>
@@ -676,6 +861,19 @@ final class MRN_Recaptcha_Enterprise_Manager {
 					<h2 style="margin-top:0;"><?php echo esc_html__( 'Create reCAPTCHA Enterprise Key', 'mrn-recaptcha-enterprise-manager' ); ?></h2>
 					<?php if ( ! $credentials_ready ) : ?>
 						<p><?php echo esc_html__( 'Save valid Google project credentials first to enable key creation.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+						<?php if ( ! empty( $missing_google_credentials ) ) : ?>
+							<p><?php echo esc_html__( 'Missing required items:', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+							<ul class="mrn-recaptcha-missing-list">
+								<?php foreach ( $missing_google_credentials as $missing_label ) : ?>
+									<li><?php echo esc_html( $missing_label ); ?></li>
+								<?php endforeach; ?>
+							</ul>
+						<?php endif; ?>
+						<p>
+							<a class="button button-secondary" href="<?php echo esc_url( self::get_settings_page_url( self::TAB_CREDENTIALS ) ); ?>">
+								<?php echo esc_html__( 'Open Credentials', 'mrn-recaptcha-enterprise-manager' ); ?>
+							</a>
+						</p>
 					<?php else : ?>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="<?php echo esc_attr( self::CREATE_KEY_ACTION ); ?>" />

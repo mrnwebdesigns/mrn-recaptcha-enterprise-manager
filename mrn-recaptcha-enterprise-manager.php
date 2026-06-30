@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MRN reCAPTCHA Enterprise Manager
  * Description: Create and manage Google reCAPTCHA Enterprise website keys inside WordPress, with optional WPForms key sync.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: MRN Web Designs
  */
 
