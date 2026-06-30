@@ -484,9 +484,8 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	 * @return void
 	 */
 	private static function maybe_load_sticky_toolbar_helper() {
-		$local_toolbar_helper = dirname( __FILE__ ) . '/mrn-sticky-settings-toolbar.php';
-		if ( file_exists( $local_toolbar_helper ) ) {
-			require_once $local_toolbar_helper;
+		if ( file_exists( __DIR__ . '/mrn-sticky-settings-toolbar.php' ) ) {
+			require_once __DIR__ . '/mrn-sticky-settings-toolbar.php';
 		}
 	}
 
