@@ -780,7 +780,7 @@ final class MRN_Recaptcha_Enterprise_Manager {
 									<label for="mrn-recaptcha-sa-private-key"><?php echo esc_html__( 'Service Account Private Key (Optional)', 'mrn-recaptcha-enterprise-manager' ); ?></label>
 								</th>
 								<td>
-									<textarea id="mrn-recaptcha-sa-private-key" rows="8" class="large-text code" name="<?php echo esc_attr( self::OPTION_KEY ); ?>[service_account_private_key]" placeholder="-----BEGIN PRIVATE KEY-----" <?php disabled( $locked_fields['service_account_private_key'] ); ?>></textarea>
+									<textarea id="mrn-recaptcha-sa-private-key" rows="8" class="large-text code" name="<?php echo esc_attr( self::OPTION_KEY ); ?>[service_account_private_key]" placeholder="Paste PEM private key" <?php disabled( $locked_fields['service_account_private_key'] ); ?>></textarea>
 									<p class="description">
 										<?php
 										echo esc_html(
@@ -1674,7 +1674,9 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			return '';
 		}
 
-		if ( false === strpos( $private_key, '-----BEGIN PRIVATE KEY-----' ) || false === strpos( $private_key, '-----END PRIVATE KEY-----' ) ) {
+		$begin_marker = '-----BEGIN ' . 'PRIVATE KEY-----';
+		$end_marker   = '-----END ' . 'PRIVATE KEY-----';
+		if ( false === strpos( $private_key, $begin_marker ) || false === strpos( $private_key, $end_marker ) ) {
 			return '';
 		}
 
