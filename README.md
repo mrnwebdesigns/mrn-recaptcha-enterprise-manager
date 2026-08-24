@@ -1,5 +1,7 @@
 # MRN reCAPTCHA Enterprise Manager
 
+The canonical source lives in the independent `mrnwebdesigns/mrn-recaptcha-enterprise-manager` repository; MRN uses a local checkout symlink for stack integration.
+
 Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally sync generated keys to WPForms.
 
 ## What this plugin does

@@ -6,7 +6,7 @@ This directory contains the MRN reCAPTCHA Enterprise Manager WordPress plugin in
 ## Rules
 - Keep changes scoped to this plugin release unit.
 - Preserve WordPress security controls for admin actions, REST/AJAX/admin-post handlers, nonces, capabilities, sanitization, and escaping.
-- Treat `MRN_QA_CODE_ANALYSIS_SCOPE=all mrn-qa run --project-root /Users/khofmeyer/Development/MRN/plugins/mrn-recaptcha-enterprise-manager` as the canonical plugin readiness signal.
+- Treat `MRN_QA_CODE_ANALYSIS_SCOPE=all mrn-qa run --project-root /Users/khofmeyer/Development/MRN-plugins/mrn-recaptcha-enterprise-manager` as the canonical plugin readiness signal.
 
 ## Safety
 - Never auto-deploy from this plugin directory.
