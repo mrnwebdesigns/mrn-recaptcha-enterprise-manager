@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class MRN_Recaptcha_Enterprise_Manager {
-	const VERSION                  = '0.1.1';
+	const VERSION                  = '0.1.2';
 	const OPTION_KEY               = 'mrn_recaptcha_enterprise_manager_settings';
 	const PAGE_SLUG                = 'mrn-recaptcha-enterprise-manager';
 	const SETTINGS_GROUP           = 'mrn_recaptcha_enterprise_manager';
@@ -1077,6 +1077,82 @@ final class MRN_Recaptcha_Enterprise_Manager {
 	}
 
 	/**
+	 * Idempotently ensure WPForms has a site key for the current hostname.
+	 *
+	 * This is intended for authenticated Stack bootstrap through WP-CLI. It
+	 * returns only action/status metadata and never returns either generated key.
+	 *
+	 * @return array<string, string>|WP_Error
+	 */
+	public static function bootstrap_wpforms_recaptcha() {
+		if ( self::has_wpforms_recaptcha_credentials() ) {
+			return array(
+				'status'  => 'unchanged',
+				'message' => 'WPForms reCAPTCHA credentials are already configured.',
+			);
+		}
+		if ( ! function_exists( 'wpforms' ) ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_missing', 'WPForms is not active.' );
+		}
+
+		$settings = self::get_settings();
+		if ( ! self::has_required_credentials( $settings ) ) {
+			return new WP_Error( 'mrn_recaptcha_credentials_missing', 'The code-locked Google service credentials are incomplete.' );
+		}
+
+		$home_host = wp_parse_url( home_url(), PHP_URL_HOST );
+		$home_host = is_string( $home_host ) ? strtolower( trim( $home_host ) ) : '';
+		$domains   = self::sanitize_domain_list( (string) ( $settings['default_allowed_domains'] ?? '' ) );
+		if ( '' !== $home_host && ! in_array( $home_host, $domains, true ) ) {
+			$domains[] = $home_host;
+		}
+		$domains = array_values( array_unique( $domains ) );
+		if ( '' === $home_host || empty( $domains ) ) {
+			return new WP_Error( 'mrn_recaptcha_bootstrap_domain', 'The current site hostname could not be resolved.' );
+		}
+
+		$project_id      = (string) $settings['project_id'];
+		$integration_type = self::sanitize_integration_type( (string) ( $settings['default_integration_type'] ?? self::INTEGRATION_TYPE_SCORE ) );
+		$token_response  = self::request_google_access_token( (string) $settings['service_account_email'], self::get_runtime_private_key( $settings ) );
+		if ( is_wp_error( $token_response ) ) {
+			return $token_response;
+		}
+
+		$access_token = (string) $token_response['access_token'];
+		$key          = self::find_matching_recaptcha_key( $project_id, $access_token, $home_host, $integration_type );
+		if ( is_wp_error( $key ) ) {
+			return $key;
+		}
+		$status = 'reused';
+		if ( empty( $key ) ) {
+			$key = self::create_recaptcha_key( $project_id, $access_token, 'WPForms ' . $home_host, $domains, $integration_type );
+			if ( is_wp_error( $key ) ) {
+				return $key;
+			}
+			$status = 'created';
+		}
+
+		$secret = self::retrieve_legacy_secret_key( (string) $key['key_resource_name'], $access_token );
+		if ( is_wp_error( $secret ) ) {
+			return $secret;
+		}
+		$applied = self::apply_to_wpforms_settings( (string) $key['site_key'], (string) $secret['legacy_secret_key'], $integration_type );
+		if ( empty( $applied['success'] ) ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_apply', (string) ( $applied['message'] ?? 'WPForms reCAPTCHA synchronization failed.' ) );
+		}
+
+		$form_summary = self::enable_recaptcha_on_wpforms_forms( self::get_wpforms_form_ids() );
+		if ( ! empty( $form_summary['failed'] ) ) {
+			return new WP_Error( 'mrn_recaptcha_wpforms_forms_apply', 'One or more existing WPForms forms could not be updated.' );
+		}
+
+		return array(
+			'status'  => $status,
+			'message' => 'WPForms reCAPTCHA credentials are configured for the current hostname.',
+		);
+	}
+
+	/**
 	 * Handle bulk enable request for existing WPForms.
 	 *
 	 * @return void
@@ -1162,6 +1238,69 @@ final class MRN_Recaptcha_Enterprise_Manager {
 			'key_resource_name' => $key_resource_name,
 			'site_key'          => $site_key,
 		);
+	}
+
+	/**
+	 * Find one existing Google key for the exact current hostname and type.
+	 *
+	 * @param string $project_id Project ID.
+	 * @param string $access_token OAuth access token.
+	 * @param string $home_host Current site hostname.
+	 * @param string $integration_type Google integration type.
+	 * @return array<string, string>|array{}|WP_Error
+	 */
+	private static function find_matching_recaptcha_key( $project_id, $access_token, $home_host, $integration_type ) {
+		$matches    = array();
+		$page_token = '';
+		$page       = 0;
+
+		do {
+			$query = array( 'pageSize' => 100 );
+			if ( '' !== $page_token ) {
+				$query['pageToken'] = $page_token;
+			}
+			$endpoint = self::KEYS_API_BASE . '/projects/' . rawurlencode( $project_id ) . '/keys?' . http_build_query( $query, '', '&', PHP_QUERY_RFC3986 );
+			$request  = wp_remote_get(
+				$endpoint,
+				array(
+					'timeout' => 20,
+					'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+				)
+			);
+			$response = self::normalize_json_response( $request, __( 'Unable to list existing keys.', 'mrn-recaptcha-enterprise-manager' ) );
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+
+			foreach ( (array) ( $response['keys'] ?? array() ) as $candidate ) {
+				if ( ! is_array( $candidate ) ) {
+					continue;
+				}
+				$web_settings = is_array( $candidate['webSettings'] ?? null ) ? $candidate['webSettings'] : array();
+				$domains      = self::sanitize_domain_list( implode( ',', (array) ( $web_settings['allowedDomains'] ?? array() ) ) );
+				$type         = self::sanitize_integration_type( (string) ( $web_settings['integrationType'] ?? '' ) );
+				$name         = (string) ( $candidate['name'] ?? '' );
+				$site_key     = self::extract_site_key_from_resource_name( $name );
+				if ( $type === $integration_type && in_array( $home_host, $domains, true ) && '' !== $site_key ) {
+					$matches[] = array(
+						'key_resource_name' => $name,
+						'site_key'          => $site_key,
+					);
+				}
+			}
+
+			$page_token = sanitize_text_field( (string) ( $response['nextPageToken'] ?? '' ) );
+			$page++;
+		} while ( '' !== $page_token && $page < 10 );
+
+		if ( '' !== $page_token ) {
+			return new WP_Error( 'mrn_recaptcha_key_list_truncated', 'The Google key list exceeded the safe pagination limit.' );
+		}
+		if ( count( $matches ) > 1 ) {
+			return new WP_Error( 'mrn_recaptcha_key_ambiguous', 'Multiple matching Google keys exist for this hostname and integration type.' );
+		}
+
+		return empty( $matches ) ? array() : $matches[0];
 	}
 
 	/**
@@ -1477,7 +1616,9 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		$wpforms_settings = get_option( 'wpforms_settings', array() );
 		$wpforms_settings = is_array( $wpforms_settings ) ? $wpforms_settings : array();
 
-		return '' !== trim( (string) ( $wpforms_settings['recaptcha-site-key'] ?? '' ) )
+		return 'recaptcha' === sanitize_key( (string) ( $wpforms_settings['captcha-provider'] ?? '' ) )
+			&& in_array( sanitize_key( (string) ( $wpforms_settings['recaptcha-type'] ?? '' ) ), array( 'v2', 'v3' ), true )
+			&& '' !== trim( (string) ( $wpforms_settings['recaptcha-site-key'] ?? '' ) )
 			&& '' !== trim( (string) ( $wpforms_settings['recaptcha-secret-key'] ?? '' ) );
 	}
 

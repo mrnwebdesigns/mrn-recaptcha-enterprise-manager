@@ -6,6 +6,6 @@
     "repo_path": "/Users/khofmeyer/Development/MRN-plugins/mrn-recaptcha-enterprise-manager",
     "integration_target": "mrn-plugin-stack",
     "integration_mode": "standalone-plugin",
-    "plugin_version": "0.1.1"
+    "plugin_version": "0.1.2"
   }
 }
