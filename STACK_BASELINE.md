@@ -3,7 +3,7 @@
 ## Baseline Snapshot
 - Date pinned: 2026-06-30
 - Plugin source path: `/Users/khofmeyer/Development/MRN-plugins/mrn-recaptcha-enterprise-manager`
-- Current plugin version: `0.1.1`
+- Current plugin version: `0.1.2`
 - Intended integration target: mrn-plugin-stack
 - Current release model: independent standard plugin repository
 

@@ -55,6 +55,12 @@ When these values are present, the plugin enters code-locked mode and those fiel
 6. Leave "Also enable reCAPTCHA on all existing WPForms forms now" checked to roll out form-level toggle to old forms.
 7. In `Credentials`, keep "Automatically enable Google reCAPTCHA on newly created WPForms forms" enabled for new forms.
 
+Stack bootstrap can call `MRN_Recaptcha_Enterprise_Manager::bootstrap_wpforms_recaptcha()`
+through WP-CLI. The method is idempotent: it keeps configured WPForms keys,
+reuses one exact Google key for the current hostname and integration type, or
+creates a key only when none exists. It fails closed on ambiguous matches and
+never returns either key in its result.
+
 ## Stack rollout secrets (recommended)
 
 For MRN stack rollouts, keep secrets in stack-managed secret files (gitignored) and let bootstrap inject constants into each new site's `wp-config.php`.
