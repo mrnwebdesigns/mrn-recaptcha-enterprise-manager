@@ -13,6 +13,38 @@ Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally s
 - Optionally bulk-enables WPForms form-level reCAPTCHA for existing forms.
 - Optionally auto-enables WPForms form-level reCAPTCHA for newly created forms.
 - Uses a tabbed admin screen (`Credentials` and `Create Key`) with optional MRN sticky toolbar support when available.
+- Loads WPForms reCAPTCHA v3 asynchronously while preserving token-before-submit behavior.
+
+## Frontend loading
+
+Enterprise keys synchronized to WPForms use its compatible reCAPTCHA v3
+`api.js` integration. Version 0.1.3 makes only that loader asynchronous. Google's
+readiness queue protects WPForms initialization; an additional wrapper queues
+early token requests until the API is ready. Existing inline scripts, script
+attributes, and WordPress nonce filters are preserved.
+
+The loader starts immediately when its existing script tag is reached. This
+does not delay protection until interaction or remove any verification. It
+leaves v2, invisible v2, hCaptcha, Turnstile, custom API URLs, native
+`enterprise.js` integrations, and unrelated scripts unchanged. If WPForms'
+expected v3 execution function is absent from its inline output, the original
+synchronous tag is retained.
+
+This removes a parser-blocking request; it does not eliminate reCAPTCHA's
+download or CPU cost and does not guarantee a PageSpeed score. Qualify each
+deployment with repeated measurements and form-token checks. See Google's
+[loading guidance](https://developers.google.com/recaptcha/docs/loading).
+
+Focused checks use a WordPress checkout and captured page HTML:
+
+```sh
+WP_CORE_DIR=/path/to/wordpress php tests/frontend-contract.php before.html candidate.html
+node tests/frontend-ready.mjs candidate.html
+php tests/bootstrap-contract.php
+```
+
+The first command also generates a candidate page for isolated browser checks;
+it does not change a WordPress runtime.
 
 ## Requirements
 
