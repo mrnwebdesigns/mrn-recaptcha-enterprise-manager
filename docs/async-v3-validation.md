@@ -29,3 +29,47 @@ Simulated median score improved from 86 to 88; median blocking time decreased fr
 A fresh, unchanged [Google baseline](https://pagespeed.web.dev/analysis/https-gloves-online-com/zptvamjgr1?form_factor=mobile) scored 70 mobile / 63 desktop, compared with an earlier 57 / 88. The newer mobile run paints earlier but exposes much more blocking time (739 ms). These baseline changes must not be credited to this candidate. The reCAPTCHA payload and execution cost remain.
 
 The candidate follows [Google's asynchronous loading guidance](https://developers.google.com/recaptcha/docs/loading), but this is not proof of green performance scores. Any live trial must preserve an exact rollback and compare fresh reports before wider promotion.
+
+## Approved live trial and rollback
+
+The owner approved an explicit Liquid Web SSH exception after MainWP safe mode
+blocked the install preview. The exact `f7f00d1` package was installed only on
+Gloves Online at 16:26:24 UTC, after verified remote database backup
+`459125ce8fdc`. File hashes, hook registration, active version, and unchanged
+CAPTCHA settings were verified. Other plugin files were preserved.
+
+| Google PSI run | Mobile | Desktop |
+| --- | ---: | ---: |
+| Immediate unchanged baseline | 70 | 63 |
+| [Trial 1](https://pagespeed.web.dev/analysis/https-gloves-online-com/cbgxogxtkp?form_factor=mobile) | 86 | 97 |
+| [Trial 2](https://pagespeed.web.dev/analysis/https-gloves-online-com/x6i27sod5g?form_factor=mobile) | 57 | 92 |
+| [Trial 3](https://pagespeed.web.dev/analysis/https-gloves-online-com/7cgbeup4fv?form_factor=mobile) | 55 | 98 |
+
+The mobile improvement did not hold. In the two slow candidate runs, observed
+FCP and LCP were identical (2.360 s and 2.479 s), even though load completed
+earlier (1.265 s and 1.841 s). Google then modeled LCP at approximately 11.56 s.
+The baseline mobile CPU benchmark was 321.5; candidate benchmarks were 1039.5,
+872, and 801. The large benchmark variation limits causal score comparisons.
+Do not claim that asynchronous loading solved the mobile paint delay.
+
+Live token checks and UI/axe checks passed. Google's token verification returned
+the expected hostname/action; automated scores were 0, so these checks do not
+claim a successful human newsletter submission. No customer messages were sent.
+The MRN runtime API check passed. The generic smoke check flagged
+`requestStorageAccess: Permission denied.` from Google's reCAPTCHA iframe;
+the identical message appears in both baseline PSI reports. A repeat smoke
+against the homepage and product page passed when only that exact third-party
+warning was excluded. The unfiltered warning remains documented; this is not
+an unqualified release-QA pass.
+
+Under the agreed rollback condition, the original active 0.1.1 plugin was
+restored at 16:33:38 UTC after a second verified remote database backup,
+`0d13740a72d9`. Every original plugin file hash was verified, the new files and
+frontend hook were removed, settings stayed unchanged, and page cache was
+cleared. The candidate remains an unmerged draft; it is not a Stack/Fleet
+release or a deployed optimization.
+
+The [restored-plugin control](https://pagespeed.web.dev/analysis/https-gloves-online-com/qtvs9sqdmp?form_factor=mobile)
+scored 56 mobile / 87 desktop. Its token acquisition and Google verification
+passed again, and the public HTML contains the original synchronous loader with
+no trial shims. The low mobile result persists with either implementation.
