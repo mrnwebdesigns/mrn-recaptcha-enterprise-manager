@@ -17,6 +17,7 @@ add_filter( 'pre_http_request', function ( $pre, $args, $url ) {
 	if ( 'https://oauth2.googleapis.com/token' === $url ) {
 		$data = array( 'access_token' => 'fixture-access', 'expires_in' => 3600 );
 	} elseif ( false !== strpos( $url, '/keys/' ) ) {
+		$GLOBALS['fixture_key_urls'][] = $url;
 		$data = array( 'name' => 'projects/isolated-fixture-project/keys/fixture-site-key-1234567890', 'webSettings' => array( 'integrationType' => 'SCORE', 'allowedDomains' => array( '127.0.0.1' ), 'allowAllDomains' => false ) );
 		if ( isset( $GLOBALS['fixture_key_override'] ) ) $data = $GLOBALS['fixture_key_override'];
 	} elseif ( false !== strpos( $url, '/assessments' ) ) {

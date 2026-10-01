@@ -41,10 +41,20 @@ check( ! empty( $settings['verification'] ), 'Production SCORE metadata and host
 update_option( MRN_Recaptcha_Comments::OPTION, $settings );
 check( get_option( 'wpforms_settings' ) === $wpforms, 'Comment setup preserves every WPForms setting' );
 $base_key = array( 'name' => 'projects/isolated-fixture-project/keys/fixture-site-key-1234567890', 'webSettings' => array( 'integrationType' => 'SCORE', 'allowedDomains' => array( '127.0.0.1' ), 'allowAllDomains' => false ) );
-foreach ( array( 'checkbox', 'wrong-project', 'wrong-domain', 'all-domains', 'testing', 'waf', 'empty' ) as $mode ) {
+$GLOBALS['fixture_key_override'] = array_replace( $base_key, array( 'name' => 'projects/123456789012/keys/fixture-site-key-1234567890' ) );
+check( true === MRN_Recaptcha_Comments::verify_key( $settings ), 'Accept canonical project number returned by project-ID-scoped Google GET' );
+check( 'https://recaptchaenterprise.googleapis.com/v1/projects/isolated-fixture-project/keys/fixture-site-key-1234567890' === end( $GLOBALS['fixture_key_urls'] ), 'Canonical response is obtained only from the configured project and exact key endpoint' );
+check( ! empty( MRN_Recaptcha_Comments::sanitize_settings( $input )['verification'] ), 'Canonical project response permits verified setup' );
+$resource_check = new ReflectionMethod( MRN_Recaptcha_Comments::class, 'key_resource_matches' );
+check( $resource_check->invoke( null, 'projects/123456789012/keys/example', '123456789012', 'example' ), 'Configured numeric project accepts only its exact resource' );
+check( ! $resource_check->invoke( null, 'projects/999999999999/keys/example', '123456789012', 'example' ), 'Different numeric project cannot replace a configured project number' );
+foreach ( array( 'checkbox', 'wrong-project', 'wrong-key', 'numeric-wrong-key', 'malformed-name', 'wrong-domain', 'all-domains', 'testing', 'waf', 'empty' ) as $mode ) {
 	$key = $base_key;
 	if ( 'checkbox' === $mode ) $key['webSettings']['integrationType'] = 'CHECKBOX';
 	if ( 'wrong-project' === $mode ) $key['name'] = 'projects/other/keys/fixture-site-key-1234567890';
+	if ( 'wrong-key' === $mode ) $key['name'] = 'projects/isolated-fixture-project/keys/other-key';
+	if ( 'numeric-wrong-key' === $mode ) $key['name'] = 'projects/123456789012/keys/other-key';
+	if ( 'malformed-name' === $mode ) $key['name'] = array( 'projects/123456789012/keys/fixture-site-key-1234567890' );
 	if ( 'wrong-domain' === $mode ) $key['webSettings']['allowedDomains'] = array( 'other.test' );
 	if ( 'all-domains' === $mode ) $key['webSettings']['allowAllDomains'] = true;
 	if ( 'testing' === $mode ) $key['testingOptions'] = array( 'testingScore' => 1 );

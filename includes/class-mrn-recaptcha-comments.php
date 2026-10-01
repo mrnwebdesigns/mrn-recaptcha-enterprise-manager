@@ -67,9 +67,8 @@ final class MRN_Recaptcha_Comments {
 		if ( is_wp_error( $key ) ) {
 			return $key;
 		}
-		$expected = 'projects/' . MRN_Recaptcha_Enterprise_Manager::comment_project_id() . '/keys/' . $settings['site_key'];
 		$web = $key['webSettings'] ?? array();
-		if ( $expected !== ( $key['name'] ?? '' ) || 'SCORE' !== ( $web['integrationType'] ?? '' ) || ! empty( $web['allowAllDomains'] ) || ! empty( $key['testingOptions'] ) || ! empty( $key['wafSettings'] ) ) {
+		if ( ! self::key_resource_matches( $key['name'] ?? '', MRN_Recaptcha_Enterprise_Manager::comment_project_id(), $settings['site_key'] ) || 'SCORE' !== ( $web['integrationType'] ?? '' ) || ! empty( $web['allowAllDomains'] ) || ! empty( $key['testingOptions'] ) || ! empty( $key['wafSettings'] ) ) {
 			return new WP_Error( 'mrn_recaptcha_key_type', __( 'Use a production Enterprise SCORE website key in the configured project with domain verification enabled.', 'mrn-recaptcha-enterprise-manager' ) );
 		}
 		$allowed = $web['allowedDomains'] ?? array();
@@ -87,6 +86,20 @@ final class MRN_Recaptcha_Comments {
 			}
 		}
 		return true;
+	}
+
+	/** Google canonicalizes text project IDs to numbers in authenticated keys.get responses. */
+	private static function key_resource_matches( $name, $project, $site_key ) {
+		if ( ! is_string( $name ) ) {
+			return false;
+		}
+		if ( 'projects/' . $project . '/keys/' . $site_key === $name ) {
+			return true;
+		}
+		// The redirect-disabled GET is scoped to our configured project and exact key.
+		// Google resolves that project alias; no extra Resource Manager IAM grant is needed.
+		// A configured numeric project must still match exactly; never accept another alias.
+		return ! preg_match( '/^[0-9]+$/D', $project ) && (bool) preg_match( '#^projects/[1-9][0-9]*/keys/' . preg_quote( $site_key, '#' ) . '$#D', $name );
 	}
 
 	/** Settings API supplies the options.php nonce/capability checks. */
