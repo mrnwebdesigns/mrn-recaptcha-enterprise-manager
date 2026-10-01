@@ -102,6 +102,23 @@ final class MRN_Recaptcha_Comments {
 		return ! preg_match( '/^[0-9]+$/D', $project ) && (bool) preg_match( '#^projects/[1-9][0-9]*/keys/' . preg_quote( $site_key, '#' ) . '$#D', $name );
 	}
 
+	/** A synthetic invalid token checks assessment access without submitting content. */
+	public static function verify_assessment_access( $settings ) {
+		$result = MRN_Recaptcha_Enterprise_Manager::comment_api_request(
+			'assessments',
+			array( 'event' => array( 'token' => 'mrn-setup-probe-' . wp_generate_uuid4(), 'siteKey' => $settings['site_key'], 'expectedAction' => 'mrn_setup_probe' ) )
+		);
+		if ( is_wp_error( $result ) ) {
+			return new WP_Error( 'mrn_recaptcha_assessment_access', __( 'Assessment access could not be verified. Check the configured service account has recaptchaenterprise.assessments.create permission and the Google API is available, then retry.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+		// Google must accept the authenticated request and reject our invalid token.
+		// Neither a bare HTTP success nor an unexpected valid token proves this contract.
+		if ( false !== ( $result['tokenProperties']['valid'] ?? null ) ) {
+			return new WP_Error( 'mrn_recaptcha_assessment_response', __( 'Google returned an unexpected setup assessment. Protection settings were not changed.', 'mrn-recaptcha-enterprise-manager' ) );
+		}
+		return true;
+	}
+
 	/** Settings API supplies the options.php nonce/capability checks. */
 	public static function sanitize_settings( $input ) {
 		$old = self::settings();
@@ -125,6 +142,9 @@ final class MRN_Recaptcha_Comments {
 		}
 		$new['minimum_score'] = (float) $score;
 		$verified = self::verify_key( $new );
+		if ( ! is_wp_error( $verified ) ) {
+			$verified = self::verify_assessment_access( $new );
+		}
 		if ( is_wp_error( $verified ) ) {
 			add_settings_error( self::OPTION, 'key_not_verified', __( 'Settings kept. Key verification failed: ', 'mrn-recaptcha-enterprise-manager' ) . $verified->get_error_message() );
 			return $old;
@@ -144,7 +164,7 @@ final class MRN_Recaptcha_Comments {
 			<h1><?php esc_html_e( 'Comment and review reCAPTCHA', 'mrn-recaptcha-enterprise-manager' ); ?></h1>
 			<?php settings_errors( self::OPTION ); ?>
 			<p><?php esc_html_e( 'Protect guests and logged-in customers. Administrators with manage_options, WP-CLI and cron are exempt. Existing moderation, purchaser checks, ratings and email routing remain in place.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
-			<p><?php esc_html_e( 'Use an Enterprise SCORE website key. Saving an enabled protection verifies the key and domains with Google. WPForms settings are separate and are never changed here. Both protections start disabled.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
+			<p><?php esc_html_e( 'Use an Enterprise SCORE website key. Saving an enabled protection verifies the key and domains, then requests a Google assessment with a synthetic invalid token to check access. This sends no comment or customer data. WPForms settings are separate and are never changed here. Both protections start disabled.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
 			<form method="post" action="options.php">
 				<?php settings_fields( self::OPTION ); ?>
 				<p><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[blog_enabled]" value="1" <?php checked( $s['blog_enabled'] ); ?>> <?php esc_html_e( 'Protect blog comments', 'mrn-recaptcha-enterprise-manager' ); ?></label></p>

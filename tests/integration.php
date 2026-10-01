@@ -37,7 +37,9 @@ delete_option( MRN_Recaptcha_Comments::OPTION );
 check( ! MRN_Recaptcha_Comments::settings()['blog_enabled'] && ! MRN_Recaptcha_Comments::settings()['reviews_enabled'], 'Both protections default off' );
 $input = array( 'blog_enabled' => 1, 'reviews_enabled' => 1, 'site_key' => 'fixture-site-key-1234567890', 'hostnames' => '127.0.0.1', 'minimum_score' => 0.5 );
 $settings = MRN_Recaptcha_Comments::sanitize_settings( $input );
-check( ! empty( $settings['verification'] ), 'Production SCORE metadata and hostname verified before enablement' );
+check( ! empty( $settings['verification'] ), 'Production SCORE metadata, hostname and assessment access verified before enablement' );
+$probe = end( $GLOBALS['fixture_assessments'] );
+check( 'mrn_setup_probe' === $probe['expectedAction'] && 0 === strpos( $probe['token'], 'mrn-setup-probe-' ) && $input['site_key'] === $probe['siteKey'] && 3 === count( $probe ), 'Setup assessment sends only a synthetic token, selected key and setup action' );
 update_option( MRN_Recaptcha_Comments::OPTION, $settings );
 check( get_option( 'wpforms_settings' ) === $wpforms, 'Comment setup preserves every WPForms setting' );
 $base_key = array( 'name' => 'projects/isolated-fixture-project/keys/fixture-site-key-1234567890', 'webSettings' => array( 'integrationType' => 'SCORE', 'allowedDomains' => array( '127.0.0.1' ), 'allowAllDomains' => false ) );
@@ -61,10 +63,36 @@ foreach ( array( 'checkbox', 'wrong-project', 'wrong-key', 'numeric-wrong-key', 
 	if ( 'waf' === $mode ) $key['wafSettings'] = array( 'wafService' => 'CA' );
 	if ( 'empty' === $mode ) $key = array();
 	$GLOBALS['fixture_key_override'] = $key;
+	$assessments_before = count( $GLOBALS['fixture_assessments'] );
 	check( is_wp_error( MRN_Recaptcha_Comments::verify_key( $settings ) ), 'Reject key: ' . $mode );
 	check( MRN_Recaptcha_Comments::sanitize_settings( $input ) === $settings, 'Failed key verification retains old configuration: ' . $mode );
+	check( count( $GLOBALS['fixture_assessments'] ) === $assessments_before, 'Invalid key never reaches assessment setup: ' . $mode );
 }
 unset( $GLOBALS['fixture_key_override'] );
+$probe_failures = array(
+	'permission-denied' => array( 'response' => array( 'code' => 403 ), 'body' => '{"error":{"message":"sensitive provider detail"}}' ),
+	'api-unavailable' => array( 'response' => array( 'code' => 503 ), 'body' => '{}' ),
+	'network-error' => new WP_Error( 'fixture_timeout', 'sensitive network detail' ),
+	'invalid-json' => array( 'response' => array( 'code' => 200 ), 'body' => 'invalid-json' ),
+	'empty-success' => array( 'response' => array( 'code' => 200 ), 'body' => '{}' ),
+	'unexpected-valid-token' => array( 'response' => array( 'code' => 200 ), 'body' => '{"tokenProperties":{"valid":true}}' ),
+	'nonboolean-token-state' => array( 'response' => array( 'code' => 200 ), 'body' => '{"tokenProperties":{"valid":0}}' ),
+);
+foreach ( $probe_failures as $mode => $response ) {
+	$GLOBALS['fixture_probe_override'] = $response;
+	delete_option( MRN_Recaptcha_Comments::OPTION );
+	$disabled = MRN_Recaptcha_Comments::settings();
+	check( $disabled === MRN_Recaptcha_Comments::sanitize_settings( $input ), 'Assessment setup cannot enable protection on ' . $mode );
+	update_option( MRN_Recaptcha_Comments::OPTION, $settings );
+	check( $settings === MRN_Recaptcha_Comments::sanitize_settings( $input ), 'Assessment setup preserves previous enabled configuration on ' . $mode );
+}
+$error_messages = wp_json_encode( get_settings_errors( MRN_Recaptcha_Comments::OPTION ) );
+check( false !== strpos( $error_messages, 'recaptchaenterprise.assessments.create' ) && false === strpos( $error_messages, 'sensitive' ), 'Setup gives actionable assessment guidance without exposing provider or network details' );
+$assessments_before = count( $GLOBALS['fixture_assessments'] );
+$off = MRN_Recaptcha_Comments::sanitize_settings( array() );
+check( ! $off['blog_enabled'] && ! $off['reviews_enabled'] && count( $GLOBALS['fixture_assessments'] ) === $assessments_before, 'Emergency disable works without a Google assessment during an outage' );
+unset( $GLOBALS['fixture_probe_override'] );
+check( $settings['verification'] === MRN_Recaptcha_Comments::sanitize_settings( $input )['verification'], 'Verified assessment access permits setup again after service recovery' );
 $post = wp_insert_post( array( 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'Comment fixture', 'comment_status' => 'open' ) );
 $page = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Unrelated fixture' ) );
 $product = new WC_Product_Simple(); $product->set_name( 'Review fixture' ); $product->set_status( 'publish' ); $product->set_regular_price( '1' ); $product->set_reviews_allowed( true ); $product_id = $product->save();

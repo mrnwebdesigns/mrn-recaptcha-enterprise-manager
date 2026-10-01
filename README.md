@@ -22,6 +22,7 @@ Version **0.2.0** also provides opt-in blog-comment and WooCommerce-review prote
 - Google Cloud project with reCAPTCHA Enterprise API enabled.
 - A service account key JSON (or equivalent service account email + private key).
 - Service account role with reCAPTCHA Enterprise key management permissions (typically reCAPTCHA Enterprise Admin).
+- Comment/review protection additionally requires `recaptchaenterprise.assessments.create`; the Admin role alone does not provide it. Enabled-settings verification checks access using a synthetic invalid-token assessment.
 
 ## Recommended deployment mode (code-locked)
 

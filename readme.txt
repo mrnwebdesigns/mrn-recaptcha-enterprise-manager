@@ -17,6 +17,7 @@ Provides the MRN Stack's code-locked Google reCAPTCHA Enterprise integration, in
 = 0.2.0 =
 * Add independently enabled Enterprise SCORE protection for blog comments and WooCommerce reviews, with verified key configuration, server-side assessment, accessible submission handling, and unchanged WPForms settings.
 * Package manifest-bound immutable source/minified JavaScript; require separate asset deployment-adapter qualification before promotion.
+* Verify assessment API access with a synthetic invalid-token probe before enabling protection; retain prior settings on failure and permit emergency disable without Google.
 * Accept Google's canonical numeric project resource for an authenticated key lookup using a configured project ID.
 
 = 0.1.2 =

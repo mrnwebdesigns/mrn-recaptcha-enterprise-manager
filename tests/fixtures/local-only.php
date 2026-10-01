@@ -24,6 +24,10 @@ add_filter( 'pre_http_request', function ( $pre, $args, $url ) {
 		$event = json_decode( $args['body'], true )['event'];
 		$GLOBALS['fixture_assessments'][] = $event;
 		$token = $event['token'];
+		if ( 'mrn_setup_probe' === $event['expectedAction'] ) {
+			if ( isset( $GLOBALS['fixture_probe_override'] ) ) return $GLOBALS['fixture_probe_override'];
+			return array( 'response' => array( 'code' => 200 ), 'body' => wp_json_encode( array( 'tokenProperties' => array( 'valid' => false, 'invalidReason' => 'MALFORMED' ) ) ) );
+		}
 		$mode = explode( ':', $token )[0];
 		if ( 'outage' === $mode ) return new WP_Error( 'fixture_outage', 'Mock provider unavailable' );
 		if ( 'http-error' === $mode ) return array( 'response' => array( 'code' => 503 ), 'body' => '{}' );
