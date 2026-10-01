@@ -17,6 +17,8 @@ MainWP `mainwp://status` reports connected to `wpcontrol.mrndev.io`, with 84 abi
 | WooCommerce | **11.1.0**, active |
 | MRN Comment Management | **1.2.0**, active; no update included |
 | WordPress / PHP | **7.1.2 / 8.3.8** |
+| Deployment agent | **0.2.5**, schema 2, private/atomic storage ready, no incomplete rollouts |
+| Active template / stylesheet | **mrn-base-stack / mrn-base-stack-child**, preservation reported |
 
 The supplied `MRN-sites/gloves/reports/comment-captcha-2026-10-01/live-state.json` records Advanced's guest-comment-only v2 configuration, the displayed “Invalid domain for site key” error, disabled login/registration/reset/checkout flags, and separate WPForms v3 credentials. Reviews are enabled and restricted to logged-in purchasers; Advanced skips logged-in users. **No review submission was tested, and this diagnosis does not establish that reviews are broken.** Comment moderation is enabled. The current Enterprise plugin manages keys/WPForms only.
 

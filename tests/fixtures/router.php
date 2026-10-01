@@ -20,6 +20,7 @@ $wp_query->is_single = true;
 $wp_query->queried_object = $post;
 $wp_query->queried_object_id = $post->ID;
 $product = wc_get_product( $ids['product'] );
+add_filter( 'comment_form_defaults', function ( $args ) { $args['title_reply_before'] = '<h2 id="reply-title" class="comment-reply-title">'; $args['title_reply_after'] = '</h2>'; return $args; } );
 ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Isolated comment protection QA</title><style>body{font:18px/1.6 system-ui;background:#fff;color:#111;max-width:760px;margin:2rem auto;padding:1rem}input,textarea,button{font:inherit;max-width:100%}textarea{width:95%}a{color:#004e8c}:focus{outline:3px solid #0068b5;outline-offset:3px}</style></head><body><main><h1>Isolated comment protection QA</h1>
 <?php
 if ( '/qa/unrelated/' === $path ) {

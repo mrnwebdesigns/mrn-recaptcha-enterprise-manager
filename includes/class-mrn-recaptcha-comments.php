@@ -148,6 +148,15 @@ final class MRN_Recaptcha_Comments {
 		return current_user_can( 'manage_options' ) || ( defined( 'WP_CLI' ) && WP_CLI ) || wp_doing_cron();
 	}
 
+	/** Preserve core's authenticated wp-admin reply flow for authorized moderators. */
+	private static function admin_reply( $post_id ) {
+		if ( ! is_admin() || ! wp_doing_ajax() || ! doing_action( 'wp_ajax_replyto-comment' ) || ! current_user_can( 'edit_post', $post_id ) ) {
+			return false;
+		}
+		$nonce = isset( $_POST['_ajax_nonce-replyto-comment'] ) && is_string( $_POST['_ajax_nonce-replyto-comment'] ) ? sanitize_text_field( wp_unslash( $_POST['_ajax_nonce-replyto-comment'] ) ) : '';
+		return (bool) wp_verify_nonce( $nonce, 'replyto-comment' );
+	}
+
 	/** Post type comes from WordPress, never a submitted type or claimed user ID. */
 	private static function action_for( $post_id ) {
 		$s = self::settings();
@@ -201,6 +210,9 @@ final class MRN_Recaptcha_Comments {
 		if ( '' === $action ) {
 			return $approved;
 		}
+		if ( self::admin_reply( $post_id ) ) {
+			return $approved;
+		}
 		// Ping/trackbacks on blog posts do not use a browser comment form.
 		// Product targets always require validation regardless of claimed comment type.
 		$ping_endpoint = ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) || ( isset( $GLOBALS['pagenow'] ) && 'wp-trackback.php' === $GLOBALS['pagenow'] );
@@ -215,10 +227,16 @@ final class MRN_Recaptcha_Comments {
 		if ( ! is_string( $s['verification'] ) || ! hash_equals( self::fingerprint( $s ), $s['verification'] ) || ! in_array( strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) ), $s['hostnames'], true ) ) {
 			return self::error( 'configuration', 503 );
 		}
-		// Public form tokens are validated by Google, not a WordPress guest nonce.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$raw = $_POST[ self::FIELD ] ?? ( $_SERVER['HTTP_X_MRN_RECAPTCHA_TOKEN'] ?? '' );
-		$token = is_string( $raw ) ? sanitize_text_field( wp_unslash( $raw ) ) : '';
+		$token = '';
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Public tokens are authenticated by the Google assessment below.
+		if ( isset( $_POST[ self::FIELD ] ) ) {
+			if ( is_string( $_POST[ self::FIELD ] ) ) {
+				$token = sanitize_text_field( wp_unslash( $_POST[ self::FIELD ] ) );
+			}
+		} elseif ( isset( $_SERVER['HTTP_X_MRN_RECAPTCHA_TOKEN'] ) && is_string( $_SERVER['HTTP_X_MRN_RECAPTCHA_TOKEN'] ) ) {
+			$token = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_MRN_RECAPTCHA_TOKEN'] ) );
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 		if ( '' === $token || strlen( $token ) > 8192 ) {
 			return self::error( 'missing', 403 );
 		}

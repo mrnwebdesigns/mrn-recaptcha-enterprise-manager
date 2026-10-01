@@ -30,7 +30,7 @@ Both checkboxes off is an emergency disable: it preserves existing key settings 
 | Guest blog commenter | CAPTCHA required when blog protection is on |
 | Subscriber/customer, including verified purchasers | CAPTCHA required on enabled targets |
 | Administrator with `manage_options` | CAPTCHA exempt, including administrative replies; native WordPress/WooCommerce rules still apply |
-| Editor/moderator/shop manager without `manage_options` | No blanket exemption; protected creations need a token |
+| Editor/moderator/shop manager without `manage_options` | Core wp-admin AJAX replies require edit permission and the valid core reply nonce; other protected creations need a token |
 | WP-CLI and WordPress cron | Trusted server operations exempt |
 | Editing/moderating existing comments | No CAPTCHA added |
 | Trusted imports using `wp_insert_comment()` directly | Unchanged; low-level insertion is not a public submission API |
