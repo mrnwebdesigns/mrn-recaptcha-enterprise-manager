@@ -4,6 +4,8 @@ The canonical source lives in the independent `mrnwebdesigns/mrn-recaptcha-enter
 
 Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally sync generated keys to WPForms.
 
+Version **0.2.0** also provides opt-in blog-comment and WooCommerce-review protection. Both start disabled, require a verified Enterprise SCORE key, and leave WPForms settings unchanged. See [configuration and testing](docs/COMMENT-PROTECTION.md) and the [Gloves migration and rollback plan](docs/GLOVES-MIGRATION.md). Production enablement is separately gated.
+
 ## What this plugin does
 
 - Stores Google project + service account credentials in plugin settings.
