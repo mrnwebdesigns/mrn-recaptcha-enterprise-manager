@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class MRN_Recaptcha_Enterprise_Manager {
-	const VERSION                  = '0.1.2';
+	const VERSION                  = '0.2.0';
 	const OPTION_KEY               = 'mrn_recaptcha_enterprise_manager_settings';
 	const PAGE_SLUG                = 'mrn-recaptcha-enterprise-manager';
 	const SETTINGS_GROUP           = 'mrn_recaptcha_enterprise_manager';
@@ -1690,6 +1690,59 @@ final class MRN_Recaptcha_Enterprise_Manager {
 		return array(
 			'access_token' => $access_token,
 		);
+	}
+
+	/** Return the configured project without exposing credentials. */
+	public static function comment_project_id() {
+		return self::get_settings()['project_id'];
+	}
+
+	/**
+	 * Authenticated Enterprise request for comment key inspection or assessment.
+	 * Does not read or modify WPForms settings or retrieve legacy secrets.
+	 *
+	 * @param string     $resource keys/KEY_ID or assessments.
+	 * @param array|null $payload Assessment event, or null for key inspection.
+	 * @return array|WP_Error
+	 */
+	public static function comment_api_request( $resource, $payload = null ) {
+		if ( ! ( null === $payload && preg_match( '#^keys/[A-Za-z0-9_-]+$#D', $resource ) ) && ! ( is_array( $payload ) && 'assessments' === $resource ) ) {
+			return new WP_Error( 'mrn_recaptcha_resource', 'Unsupported reCAPTCHA resource.' );
+		}
+		$settings = self::get_settings();
+		$private_key = self::get_runtime_private_key( $settings );
+		if ( ! self::has_required_credentials( $settings ) || '' === $private_key ) {
+			return new WP_Error( 'mrn_recaptcha_credentials', 'reCAPTCHA credentials are incomplete.' );
+		}
+		// A short credential-bound cache avoids signing an OAuth request per comment.
+		$cache_key = 'mrn_recaptcha_oauth_' . hash( 'sha256', $settings['service_account_email'] . $private_key );
+		$access = get_transient( $cache_key );
+		if ( ! is_string( $access ) || '' === $access ) {
+			$token = self::request_google_access_token( $settings['service_account_email'], $private_key );
+			if ( is_wp_error( $token ) ) {
+				return new WP_Error( 'mrn_recaptcha_unavailable', 'reCAPTCHA authentication is unavailable.' );
+			}
+			$access = $token['access_token'];
+			set_transient( $cache_key, $access, 300 );
+		}
+		$url = self::KEYS_API_BASE . '/projects/' . rawurlencode( $settings['project_id'] ) . '/' . $resource;
+		$args = array(
+			'timeout' => 10,
+			'redirection' => 0,
+			'headers' => array( 'Authorization' => 'Bearer ' . $access, 'Content-Type' => 'application/json' ),
+		);
+		if ( null === $payload ) {
+			$response = wp_remote_get( $url, $args );
+		} else {
+			$args['body'] = wp_json_encode( $payload );
+			$response = wp_remote_post( $url, $args );
+		}
+		if ( 401 === wp_remote_retrieve_response_code( $response ) ) {
+			delete_transient( $cache_key );
+		}
+		$parsed = self::normalize_json_response( $response, 'reCAPTCHA request failed.' );
+		// Do not surface provider response bodies, credentials or tokens to visitors.
+		return is_wp_error( $parsed ) ? new WP_Error( 'mrn_recaptcha_unavailable', 'reCAPTCHA is unavailable.' ) : $parsed;
 	}
 
 	/**

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MRN reCAPTCHA Enterprise Manager
  * Description: Create and manage Google reCAPTCHA Enterprise website keys inside WordPress, with optional WPForms key sync.
- * Version: 0.1.2
+ * Version: 0.2.0
  * Author: MRN Web Designs
  */
 
@@ -16,3 +16,6 @@ define( 'MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR', plugin_dir_path( __FILE__ ) );
 require_once MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR . 'includes/class-mrn-recaptcha-enterprise-manager.php';
 
 MRN_Recaptcha_Enterprise_Manager::init();
+
+require_once MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR . 'includes/class-mrn-recaptcha-comments.php';
+MRN_Recaptcha_Comments::init();
