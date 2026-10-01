@@ -1,5 +1,8 @@
 /* Run against tests/fixtures/router.php; Google is always intercepted. */
 const assert = require('node:assert/strict');
+const {createHash} = require('node:crypto');
+const {readFileSync} = require('node:fs');
+const path = require('node:path');
 const {chromium} = require('playwright');
 const AxeBuilder = require('@axe-core/playwright').default;
 const base = 'http://127.0.0.1:8765';
@@ -19,6 +22,13 @@ const base = 'http://127.0.0.1:8765';
 	ok(await page.locator('script[src*="comment-protection"]').count() === 0, 'Unrelated page has no protection script');
 	await page.goto(base + '/');
 	ok(await page.locator('.mrn-recaptcha-comment').count() === 1, 'Guest form gets one protection field');
+	const fixtureRoot = process.env.MRN_RECAPTCHA_TEST_ROOT || '/tmp/mrn-recaptcha-qa-20261001/site';
+	const manifest = JSON.parse(readFileSync(path.join(fixtureRoot, 'wp-content/plugins/mrn-recaptcha-enterprise-manager/assets/manifest.json'), 'utf8'));
+	const asset = manifest.assets['mrn-recaptcha-comments'].minified;
+	const scriptUrl = await page.locator('script[src*="comment-protection"]').getAttribute('src');
+	ok(new URL(scriptUrl).pathname.endsWith('/' + asset.path) && new URL(scriptUrl).search === '', 'Production script resolves to the manifest hash with no query version');
+	const response = await context.request.get(scriptUrl);
+	ok(response.status() === 200 && /javascript/.test(response.headers()['content-type']) && createHash('sha256').update(await response.body()).digest('hex') === asset.sha256, 'Served minified script bytes and content type match the manifest');
 	ok(enterpriseLoads === 0, 'Google script is deferred until submission');
 	const a11y = await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
 	ok(a11y.violations.length === 0, 'Blog form passes axe WCAG A/AA');

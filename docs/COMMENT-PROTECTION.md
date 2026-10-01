@@ -56,6 +56,22 @@ Do not enable overlapping CAPTCHA providers on the same form. The plugin does no
 
 ## Local tests
 
+### Immutable asset package
+
+Use the Node version in `.node-version` and the locked esbuild dependency. On a clean committed checkout:
+
+```bash
+npm ci --ignore-scripts --no-fund --no-audit
+npm test
+python3 tools/build-release.py /absolute/new-release-directory
+```
+
+The builder exports the exact commit, builds the source and minified JavaScript together, verifies both, and packages full-SHA-256 filenames plus `assets/manifest.json`. The receipt binds the package and manifest to the source commit and toolchain. Run it twice into separate empty directories and compare archive hashes. Existing artifacts cannot be overwritten. Tests reject stale output, missing files, altered bytes, and immutable-name collisions; a behavior change produces a new URL without relying on the plugin version.
+
+Install the generated ZIP in the disposable runtime before browser tests. A source checkout alone has no generated manifest. The runtime resolves the manifest once per request, selects the hashed source with `SCRIPT_DEBUG` or minified output otherwise, and supplies no query version. Missing manifest entries/files produce visible unavailable feedback and no unversioned fallback. Release verification checks hashes; runtime requests do not rehash files.
+
+The package satisfies the build portion of MRN's asset standard. It does **not** qualify a deployment adapter: the serving environment must publish and retain immutable assets before HTML references them, atomically activate code plus manifest, pin each request to one release, invalidate only affected HTML, and prove public asset checksums and rollback/open-tab behavior. WordPress's ordinary plugin-directory replacement cannot be assumed to retain old asset URLs. Keep promotion blocked until the optional-plugin route demonstrates these guarantees. New child-theme GitHub Actions deployment does not deploy this shared plugin.
+
 Use a disposable WordPress runtime, separate database, fresh local content and blocked outbound mail. The fixture refuses to load unless `MRN_RECAPTCHA_ISOLATED_TEST=true`, environment type is `local`, and `WP_HOME` is exactly `http://127.0.0.1:8765`. Never copy fixtures to a managed site or include them in a release ZIP.
 
 The test run used WordPress 7.1.2, WooCommerce 11.1.0, PHP 8.5.6, and an isolated SQLite database. Google metadata/OAuth/assessments are deterministic mocked responses; all other PHP HTTP is blocked. Browser Google calls are intercepted. Static compatibility checks cover PHP 7.4–8.3. Production PHP 8.3 and the Gloves theme/cache/consent stack still require staging qualification.
@@ -75,7 +91,7 @@ MRN QA must inspect the candidate's staged snapshot or committed SHA, never a ba
 
 ## Adoption on other Stack sites
 
-Inventory exact versions, active theme, native comment/review forms, custom submission endpoints, current CAPTCHA providers, purchaser/moderation/rating rules and notification routing. Install only the approved checksum-qualified package through the site's supported route and backup gates. Keep both features off initially; verify staging keys and genuine assessments; approve separate enablement per surface; switch existing coverage without an unprotected or duplicate-provider interval; purge form HTML caches. Verify WPForms independently before and after. Never automatically apply this to a fleet or add login, registration, reset or checkout protection.
+Inventory exact versions, active theme, native comment/review forms, custom submission endpoints, current CAPTCHA providers, purchaser/moderation/rating rules and notification routing. Install only the approved checksum-qualified package through the site's qualified asset deployment route and backup gates. Keep both features off initially; verify staging keys and genuine assessments; approve separate enablement per surface; switch existing coverage without an unprotected or duplicate-provider interval; invalidate only affected form HTML caches. Verify WPForms independently before and after. Never automatically apply this to a fleet or add login, registration, reset or checkout protection.
 
 ## Reference contracts
 

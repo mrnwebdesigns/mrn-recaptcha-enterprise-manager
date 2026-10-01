@@ -10,6 +10,8 @@ final class MRN_Recaptcha_Comments {
 	const PAGE = 'mrn-recaptcha-comment-protection';
 	const FIELD = 'mrn_recaptcha_token';
 	private static $validated = array();
+	private static $asset_manifest = null;
+	private static $asset_manifest_loaded = false;
 
 	/** Register frontend and server checks outside the manager's admin-only hooks. */
 	public static function init() {
@@ -176,7 +178,12 @@ final class MRN_Recaptcha_Comments {
 			return;
 		}
 		$s = self::settings();
-		wp_enqueue_script( 'mrn-recaptcha-comments', plugins_url( 'assets/comment-protection.js', MRN_RECAPTCHA_ENTERPRISE_MANAGER_FILE ), array(), MRN_Recaptcha_Enterprise_Manager::VERSION, true );
+		$asset = self::frontend_asset();
+		if ( '' === $asset ) {
+			echo '<p role="alert">' . esc_html__( 'Spam protection is unavailable. Please contact the site before submitting.', 'mrn-recaptcha-enterprise-manager' ) . '</p>';
+			return;
+		}
+		wp_enqueue_script( 'mrn-recaptcha-comments', plugins_url( $asset, MRN_RECAPTCHA_ENTERPRISE_MANAGER_FILE ), array(), null, true );
 		?>
 		<div class="mrn-recaptcha-comment" data-site-key="<?php echo esc_attr( $s['site_key'] ); ?>" data-action="<?php echo esc_attr( $action ); ?>" data-wait="<?php esc_attr_e( 'Checking spam protection…', 'mrn-recaptcha-enterprise-manager' ); ?>" data-error="<?php esc_attr_e( 'Spam protection could not verify this submission. Your text is still here. Please try again, or contact the site if this continues.', 'mrn-recaptcha-enterprise-manager' ); ?>">
 			<input type="hidden" name="<?php echo esc_attr( self::FIELD ); ?>" value="">
@@ -184,6 +191,30 @@ final class MRN_Recaptcha_Comments {
 			<noscript><p><?php esc_html_e( 'JavaScript is required for spam verification. Enable it and reload before submitting.', 'mrn-recaptcha-enterprise-manager' ); ?></p></noscript>
 		</div>
 		<?php
+	}
+
+	/** Resolve the packaged manifest once per request; never fall back to mutable JS. */
+	private static function frontend_asset() {
+		if ( ! self::$asset_manifest_loaded ) {
+			self::$asset_manifest_loaded = true;
+			$path = MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR . 'assets/manifest.json';
+			if ( is_readable( $path ) ) {
+				self::$asset_manifest = json_decode( (string) file_get_contents( $path ), true );
+			}
+		}
+		$m = self::$asset_manifest;
+		if ( ! is_array( $m ) || 1 !== ( $m['schema'] ?? 0 ) || 'mrn-recaptcha-enterprise-manager' !== ( $m['component'] ?? '' ) ) {
+			return '';
+		}
+		$variant = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? 'source' : 'minified';
+		$entry = $m['assets']['mrn-recaptcha-comments'][ $variant ] ?? array();
+		$file = $entry['path'] ?? '';
+		$hash = $entry['sha256'] ?? '';
+		$suffix = 'minified' === $variant ? '.min.js' : '.js';
+		if ( ! is_string( $hash ) || ! preg_match( '/^[a-f0-9]{64}$/D', $hash ) || $file !== 'assets/generated/comment-protection.' . $hash . $suffix || ! is_file( MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR . $file ) ) {
+			return '';
+		}
+		return $file;
 	}
 
 	public static function clear_validation() {
