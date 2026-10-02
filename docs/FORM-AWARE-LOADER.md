@@ -1,6 +1,6 @@
 # Optional WPForms v3 loading
 
-Version 0.1.4 adds an opt-in loader for a single protected WPForms 2.0.2.1
+Version 0.1.4 adds an opt-in loader for a single protected WPForms 2.0.1.1 or 2.0.2.1
 form on a page. Existing sites retain native WPForms loading by default.
 The intended Gloves scope is the homepage newsletter, form 68. Site code may
 enable it with `mrn_recaptcha_form_aware_loading` (arguments: false, form ID).
@@ -38,7 +38,8 @@ Never edit vendor WPForms files or disable its CAPTCHA option.
 
 `npm ci --ignore-scripts`, `npm test`, and full MRN plugin QA validate source.
 Build generated assets from a committed source with `tools/build-assets.mjs`;
-run `php tests/adapter.php` and `php tests/adapter.php 2.1.0` against that output.
+run `php tests/adapter.php`, `php tests/adapter.php 2.0.1.1` and
+`php tests/adapter.php 2.1.0` against that output.
 `python3 tools/build-release.py /absolute/output-directory` packages a clean
 commit with content-hashed source/minified pairs and a checksum manifest.
 This command never deploys. Named-site runtime, failure/retry and token checks

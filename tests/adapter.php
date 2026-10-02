@@ -30,7 +30,7 @@ $flags['optin'] = false; MRN_Recaptcha_Form_Loader::prepare( array( $form ) ); c
 MRN_Recaptcha_Form_Loader::prepare( array( $form, $form ) ); check( ! $hooks, 'multiple forms keep vendor integration' );
 MRN_Recaptcha_Form_Loader::prepare( array( array( 'id' => 68 ) ) ); check( ! $hooks, 'unprotected form unchanged' );
 MRN_Recaptcha_Form_Loader::prepare( array( $form ) );
-if ( '2.0.2.1' !== WPFORMS_VERSION ) { check( ! $hooks, 'unqualified vendor version unchanged' ); exit; }
+if ( ! in_array( WPFORMS_VERSION, array( '2.0.1.1', '2.0.2.1' ), true ) ) { check( ! $hooks, 'unqualified vendor version unchanged' ); exit; }
 check( count( $hooks ) === 1, 'qualified form enables adapter' );
 $native = 'var wpformsRecaptchaV3Execute = function () {}; /* wpformsRecaptchaLoaded */';
 foreach ( array( 'turnstile', 'hcaptcha' ) as $provider ) {

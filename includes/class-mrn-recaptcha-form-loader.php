@@ -13,7 +13,7 @@ final class MRN_Recaptcha_Form_Loader {
 
 	/** Activate only for one explicitly opted-in, protected form. */
 	public static function prepare( $forms ) {
-		if ( is_admin() || is_customize_preview() || ! defined( 'WPFORMS_VERSION' ) || '2.0.2.1' !== WPFORMS_VERSION || ! is_array( $forms ) || 1 !== count( $forms ) ) {
+		if ( is_admin() || is_customize_preview() || ! defined( 'WPFORMS_VERSION' ) || ! in_array( WPFORMS_VERSION, array( '2.0.1.1', '2.0.2.1' ), true ) || ! is_array( $forms ) || 1 !== count( $forms ) ) {
 			return;
 		}
 		$form = reset( $forms );
