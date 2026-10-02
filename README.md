@@ -16,6 +16,9 @@ Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally s
 
 ## Requirements
 
+Version 0.1.4 includes an opt-in [form-aware WPForms v3 loader](docs/FORM-AWARE-LOADER.md).
+It is disabled by default and does not alter server-side CAPTCHA validation.
+
 - WordPress admin access (`manage_options`).
 - Google Cloud project with reCAPTCHA Enterprise API enabled.
 - A service account key JSON (or equivalent service account email + private key).
