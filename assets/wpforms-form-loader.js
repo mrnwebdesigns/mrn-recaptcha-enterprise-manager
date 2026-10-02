@@ -1,4 +1,4 @@
-/* Opt-in WPForms 2.0.2.1 classic v3 adapter. Server validation is unchanged. */
+/* Opt-in WPForms 2.0.1.1/2.0.2.1 classic v3 adapter. Server validation is unchanged. */
 (function (window, document) {
 	'use strict';
 	window.mrnRecaptchaFormLoader = {
