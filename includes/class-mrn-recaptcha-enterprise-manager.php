@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class MRN_Recaptcha_Enterprise_Manager {
-	const VERSION                  = '0.1.2';
+	const VERSION                  = '0.1.4';
 	const OPTION_KEY               = 'mrn_recaptcha_enterprise_manager_settings';
 	const PAGE_SLUG                = 'mrn-recaptcha-enterprise-manager';
 	const SETTINGS_GROUP           = 'mrn_recaptcha_enterprise_manager';

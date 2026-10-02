@@ -1,0 +1,12 @@
+{
+  "name": "mrn-recaptcha-enterprise-manager-assets",
+  "private": true,
+  "version": "0.1.4",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}
