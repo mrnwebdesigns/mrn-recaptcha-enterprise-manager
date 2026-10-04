@@ -4,6 +4,8 @@ The canonical source lives in the independent `mrnwebdesigns/mrn-recaptcha-enter
 
 Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally sync generated keys to WPForms.
 
+Version **0.2.0** also provides opt-in blog-comment and WooCommerce-review protection. Both start disabled, require a verified Enterprise SCORE key, and leave WPForms settings unchanged. See [configuration and testing](docs/COMMENT-PROTECTION.md) and the [Gloves migration and rollback plan](docs/GLOVES-MIGRATION.md). Production enablement is separately gated.
+
 ## What this plugin does
 
 - Stores Google project + service account credentials in plugin settings.
@@ -23,6 +25,7 @@ It is disabled by default and does not alter server-side CAPTCHA validation.
 - Google Cloud project with reCAPTCHA Enterprise API enabled.
 - A service account key JSON (or equivalent service account email + private key).
 - Service account role with reCAPTCHA Enterprise key management permissions (typically reCAPTCHA Enterprise Admin).
+- Comment/review protection additionally requires `recaptchaenterprise.assessments.create`; the Admin role alone does not provide it. Enabled-settings verification checks access using a synthetic invalid-token assessment.
 
 ## Recommended deployment mode (code-locked)
 
@@ -97,3 +100,7 @@ Supported override env vars (optional):
 - Private key material is stored encrypted with a key derived from `wp_salt( 'auth' )`.
 - Creation/sync actions require `manage_options` and a valid nonce.
 - In code-locked mode, runtime credentials come from constants/env instead of option storage.
+
+## October Stack reconciliation
+
+Version 0.2.0 includes both opt-in comment/review Enterprise protection and the later WPForms form-aware loader. The asset build now emits and verifies both immutable source/minified pairs in one manifest. Both features remain off by default. Google assessment permission, genuine token/submission qualification and the optional-plugin atomic deployment route remain required before remotely enabling comment/review protection; merging this source does not retire an existing site protection plugin.
