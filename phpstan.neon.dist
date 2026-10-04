@@ -1,0 +1,18 @@
+parameters:
+    level: 3
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    paths:
+        - mrn-recaptcha-enterprise-manager.php
+        - includes
+    tmpDir: .tmp/phpstan
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+    excludePaths:
+        # Runtime fixtures redefine external APIs and execute in separate processes.
+        analyseAndScan:
+            - */tests/*
+        analyse:
+            - */node_modules/*
+            - */vendor/*
+            - .tmp/*
