@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class MRN_Recaptcha_Comments {
 	const OPTION = 'mrn_recaptcha_comment_protection';
+	const PAUSE_OPTION = 'mrn_recaptcha_submission_pause';
 	const PAGE = 'mrn-recaptcha-comment-protection';
 	const FIELD = 'mrn_recaptcha_token';
 	private static $validated = array();
@@ -206,6 +207,10 @@ final class MRN_Recaptcha_Comments {
 	}
 
 	public static function render_field( $post_id ) {
+		if ( self::paused( $post_id ) && ! self::exempt() ) {
+			echo '<p role="alert">' . esc_html__( 'Comments and reviews are briefly unavailable while spam protection is updated. Please try again shortly.', 'mrn-recaptcha-enterprise-manager' ) . '</p>';
+			return;
+		}
 		$action = self::action_for( $post_id );
 		if ( '' === $action || self::exempt() ) {
 			return;
@@ -270,6 +275,9 @@ final class MRN_Recaptcha_Comments {
 			return $approved;
 		}
 		$post_id = absint( $data['comment_post_ID'] ?? 0 );
+		if ( self::paused( $post_id ) && ! self::admin_reply( $post_id ) ) {
+			return new WP_Error( 'mrn_recaptcha_migration_paused', __( 'Comments and reviews are briefly unavailable while spam protection is updated. Your submission was not saved. Please try again shortly.', 'mrn-recaptcha-enterprise-manager' ), self::error_data( 503 ) );
+		}
 		$action = self::action_for( $post_id );
 		if ( '' === $action ) {
 			return $approved;
@@ -327,6 +335,11 @@ final class MRN_Recaptcha_Comments {
 
 	private static function error( $reason, $status ) {
 		return new WP_Error( 'mrn_recaptcha_' . $reason, __( 'Spam verification failed or is unavailable. Return to the form and submit again for a fresh check. If this continues, please contact the site. Your submission was not saved.', 'mrn-recaptcha-enterprise-manager' ), self::error_data( $status ) );
+	}
+
+	/** Explicit deployment pause has no timer: incomplete cutovers fail closed. */
+	private static function paused( $post_id ) {
+		return (bool) get_option( self::PAUSE_OPTION, false ) && in_array( get_post_type( $post_id ), array( 'post', 'product' ), true );
 	}
 
 	/** wp-comments-post.php expects an integer; REST expects a status map. */
