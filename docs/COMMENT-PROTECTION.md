@@ -1,16 +1,18 @@
-# Comment and review protection — 0.2.0 candidate
+# Comment and review protection — 0.2.2 candidate
 
 This release adds two opt-in protections under **Settings → Comment reCAPTCHA**:
 
 | Setting | Default | Scope |
 | --- | --- | --- |
-| Protect blog comments | Off | Comments on WordPress `post` objects |
+| Protect WordPress comments | Off | Comments on posts, pages, attachments and all other non-product post types |
 | Protect WooCommerce product reviews | Off | Submissions on `product` objects while WooCommerce is loaded |
 | Enterprise site key | Empty | An explicitly selected Enterprise **SCORE** website key |
 | Exact accepted hostnames | Empty | Includes the canonical `home_url()` hostname and every public submitting alias |
 | Minimum score | 0.5 | Shared by both protections; permitted range 0.1–1.0 |
 
 These settings live only in `mrn_recaptcha_comment_protection`. They do not modify the manager credential option, WPForms global keys, form-level toggles, or existing WPForms provisioning behavior. There is no automatic activation on upgrade and no automatic key reuse. CHECKBOX/v2, WAF, unrestricted-domain, and test keys are rejected by the new setup flow.
+
+The stored `blog_enabled` setting and Google action `mrn_blog_comment` retain their compatibility names. Version 0.2.2 broadens that setting to every non-product WordPress comment target. Product reviews remain independently controlled. The explicit deployment pause covers every existing comment target even while both protection settings are off. Before disabling a legacy comment provider, the migration agent requires the `all-non-product-types` coverage marker and verified public serving of this release.
 
 ## Key preparation
 
@@ -27,7 +29,7 @@ Both checkboxes off is an emergency disable: it preserves existing key settings 
 
 | Actor/operation | Behavior |
 | --- | --- |
-| Guest blog commenter | CAPTCHA required when blog protection is on |
+| Guest WordPress commenter, including page and attachment comments | CAPTCHA required when WordPress comment protection is on |
 | Subscriber/customer, including verified purchasers | CAPTCHA required on enabled targets |
 | Administrator with `manage_options` | CAPTCHA exempt, including administrative replies; native WordPress/WooCommerce rules still apply |
 | Editor/moderator/shop manager without `manage_options` | Core wp-admin AJAX replies require edit permission and the valid core reply nonce; other protected creations need a token |
@@ -36,7 +38,8 @@ Both checkboxes off is an emergency disable: it preserves existing key settings 
 | Trusted imports using `wp_insert_comment()` directly | Unchanged; low-level insertion is not a public submission API |
 | Blog pingbacks/trackbacks via their actual server endpoints | Unchanged |
 | Arbitrary claimed comment type, user ID or REST body ID | Cannot grant an exemption |
-| Pages, custom post types, order notes | Unaffected unless the actual target is an enabled blog/product object |
+| Public comments on custom post types | CAPTCHA required when WordPress comment protection is on |
+| Privileged WooCommerce order notes and trusted imports | Existing low-level insertion and trusted server exemptions remain unchanged |
 
 The new filter returns the previous approval value after validation. It does not approve, publish, trash, change ratings, alter recipient filters, or send mail. WooCommerce's native verified-owner check remains; the new layer also enforces that rule on alternate `wp_allow_comment()` paths. Administrative CAPTCHA exemption does not override WooCommerce's public purchaser requirement.
 
