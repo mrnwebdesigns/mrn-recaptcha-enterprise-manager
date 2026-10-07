@@ -123,7 +123,7 @@ $_POST = array(); $spoof = new_comment_data( $post ); $spoof['user_ID'] = 1; $sp
 check( is_wp_error( MRN_Recaptcha_Comments::validate_comment( 0, $spoof ) ), 'Claimed admin user ID does not exempt anonymous submissions' );
 $spoof['comment_type'] = 'pingback';
 check( is_wp_error( MRN_Recaptcha_Comments::validate_comment( 0, $spoof ) ), 'Claimed pingback outside ping endpoint cannot bypass validation' );
-check( 0 === MRN_Recaptcha_Comments::validate_comment( 0, new_comment_data( $page ) ), 'Unrelated post types are unaffected' );
+check( is_wp_error( MRN_Recaptcha_Comments::validate_comment( 0, new_comment_data( $page ) ) ), 'Enabled WordPress comment protection also covers pages' );
 $error = new WP_Error( 'previous', 'Previous validation failed' );
 check( $error === MRN_Recaptcha_Comments::validate_comment( $error, new_comment_data( $post ) ), 'Earlier validation errors preserved' );
 wp_set_current_user( $buyer ); $_POST = array();

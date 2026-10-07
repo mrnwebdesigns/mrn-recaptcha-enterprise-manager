@@ -1,5 +1,5 @@
 <?php
-/** Explicit Enterprise protection for public blog comments and product reviews. */
+/** Explicit Enterprise protection for public WordPress comments and product reviews. */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -7,6 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class MRN_Recaptcha_Comments {
 	const OPTION = 'mrn_recaptcha_comment_protection';
+	const PAUSE_OPTION = 'mrn_recaptcha_submission_pause';
+	const WORDPRESS_COMMENT_SCOPE = 'all-non-product-types';
 	const PAGE = 'mrn-recaptcha-comment-protection';
 	const FIELD = 'mrn_recaptcha_token';
 	private static $validated = array();
@@ -167,7 +169,7 @@ final class MRN_Recaptcha_Comments {
 			<p><?php esc_html_e( 'Use an Enterprise SCORE website key. Saving an enabled protection verifies the key and domains, then requests a Google assessment with a synthetic invalid token to check access. This sends no comment or customer data. WPForms settings are separate and are never changed here. Both protections start disabled.', 'mrn-recaptcha-enterprise-manager' ); ?></p>
 			<form method="post" action="options.php">
 				<?php settings_fields( self::OPTION ); ?>
-				<p><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[blog_enabled]" value="1" <?php checked( $s['blog_enabled'] ); ?>> <?php esc_html_e( 'Protect blog comments', 'mrn-recaptcha-enterprise-manager' ); ?></label></p>
+				<p><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[blog_enabled]" value="1" <?php checked( $s['blog_enabled'] ); ?>> <?php esc_html_e( 'Protect WordPress comments', 'mrn-recaptcha-enterprise-manager' ); ?></label></p>
 				<p><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[reviews_enabled]" value="1" <?php checked( $s['reviews_enabled'] ); ?>> <?php esc_html_e( 'Protect WooCommerce product reviews', 'mrn-recaptcha-enterprise-manager' ); ?></label></p>
 				<p><label for="mrn-comment-key"><?php esc_html_e( 'Enterprise site key', 'mrn-recaptcha-enterprise-manager' ); ?></label><br><input class="regular-text" id="mrn-comment-key" name="<?php echo esc_attr( self::OPTION ); ?>[site_key]" value="<?php echo esc_attr( $s['site_key'] ); ?>" autocomplete="off"></p>
 				<p><label for="mrn-comment-hosts"><?php esc_html_e( 'Exact accepted hostnames (comma separated)', 'mrn-recaptcha-enterprise-manager' ); ?></label><br><input class="regular-text" id="mrn-comment-hosts" name="<?php echo esc_attr( self::OPTION ); ?>[hostnames]" value="<?php echo esc_attr( implode( ', ', $s['hostnames'] ) ); ?>" placeholder="example.com, www.example.com"></p>
@@ -196,7 +198,7 @@ final class MRN_Recaptcha_Comments {
 	private static function action_for( $post_id ) {
 		$s = self::settings();
 		$type = get_post_type( $post_id );
-		if ( 'post' === $type && ! empty( $s['blog_enabled'] ) ) {
+		if ( is_string( $type ) && '' !== $type && 'product' !== $type && ! empty( $s['blog_enabled'] ) ) {
 			return 'mrn_blog_comment';
 		}
 		if ( 'product' === $type && ! empty( $s['reviews_enabled'] ) && class_exists( 'WooCommerce' ) ) {
@@ -206,6 +208,10 @@ final class MRN_Recaptcha_Comments {
 	}
 
 	public static function render_field( $post_id ) {
+		if ( self::paused( $post_id ) && ! self::exempt() ) {
+			echo '<p role="alert" data-mrn-wordpress-comment-scope="' . esc_attr( self::WORDPRESS_COMMENT_SCOPE ) . '">' . esc_html__( 'Comments and reviews are briefly unavailable while spam protection is updated. Please try again shortly.', 'mrn-recaptcha-enterprise-manager' ) . '</p>';
+			return;
+		}
 		$action = self::action_for( $post_id );
 		if ( '' === $action || self::exempt() ) {
 			return;
@@ -270,6 +276,9 @@ final class MRN_Recaptcha_Comments {
 			return $approved;
 		}
 		$post_id = absint( $data['comment_post_ID'] ?? 0 );
+		if ( self::paused( $post_id ) && ! self::admin_reply( $post_id ) ) {
+			return new WP_Error( 'mrn_recaptcha_migration_paused', __( 'Comments and reviews are briefly unavailable while spam protection is updated. Your submission was not saved. Please try again shortly.', 'mrn-recaptcha-enterprise-manager' ), self::error_data( 503 ) );
+		}
 		$action = self::action_for( $post_id );
 		if ( '' === $action ) {
 			return $approved;
@@ -327,6 +336,12 @@ final class MRN_Recaptcha_Comments {
 
 	private static function error( $reason, $status ) {
 		return new WP_Error( 'mrn_recaptcha_' . $reason, __( 'Spam verification failed or is unavailable. Return to the form and submit again for a fresh check. If this continues, please contact the site. Your submission was not saved.', 'mrn-recaptcha-enterprise-manager' ), self::error_data( $status ) );
+	}
+
+	/** Explicit deployment pause has no timer: incomplete cutovers fail closed. */
+	private static function paused( $post_id ) {
+		$type = get_post_type( $post_id );
+		return (bool) get_option( self::PAUSE_OPTION, false ) && is_string( $type ) && '' !== $type;
 	}
 
 	/** wp-comments-post.php expects an integer; REST expects a status map. */

@@ -4,6 +4,10 @@ Target: **https://gloves-online.com/** only. This document authorizes no product
 
 The owner approved the prepared work on 2026-10-01 and asked whether it uses the new deployment methods. That approval is recorded with the original candidate receipt; it does not complete missing staging/key, backup, or adapter qualification. The subsequent asset-packaging correction has its own source commit and receipt, preserving the originally reviewed archive.
 
+## October 6 candidate correction
+
+The historical October 1 inventory below is retained as evidence. Fresh October 6 inventory found live Enterprise Manager 0.1.4 and Advanced Google reCAPTCHA 5.41. The 0.2.1 Dev pilot exposed open page and attachment comments outside its original blog/product scope; the legacy settings were restored before removing that provider. Candidate 0.2.2 covers all non-product WordPress comment targets, independently controlled WooCommerce reviews, and an explicit pause for every comment target. Agent 0.3.1 refuses preparation or reopening with the older coverage. The affected HTML set must include every public comment form, including page, attachment and custom post type forms. All replacement, genuine submission and rollback gates still apply before production removal; the current execution receipt records qualified versions and hashes.
+
 ## Deployment method
 
 This is a shared **optional-plugin** release. Use the guarded MainWP optional-plugin update/rollback route and shared release catalog; `mrn fleet update` is for platform-required plugins. The new GitHub Actions site deployment workflow owns child themes and does not ship this plugin. Do not copy code into the Gloves child theme or substitute its adapter.

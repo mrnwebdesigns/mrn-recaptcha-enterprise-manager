@@ -2,6 +2,7 @@
 """Build a deterministic, source-bound plugin ZIP; never upload or deploy it."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -23,7 +24,7 @@ destination = Path(sys.argv[1]).resolve()
 destination.mkdir(parents=True, exist_ok=True)
 commit = git("rev-parse", "HEAD").decode().strip()
 slug = "mrn-recaptcha-enterprise-manager"
-version = "0.2.0"
+version = re.search(r"^ \* Version: ([0-9.]+)$", git("show", f"{commit}:{slug}.php").decode(), re.M).group(1)
 archive = destination / f"{slug}-{version}.zip"
 receipt_path = destination / "release-receipt.json"
 if archive.exists() or receipt_path.exists():

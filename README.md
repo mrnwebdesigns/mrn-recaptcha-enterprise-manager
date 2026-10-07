@@ -4,6 +4,8 @@ The canonical source lives in the independent `mrnwebdesigns/mrn-recaptcha-enter
 
 Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally sync generated keys to WPForms.
 
+Version 0.2.2 covers WordPress comments on posts, pages, attachments and other commentable post types, with WooCommerce reviews controlled separately. The existing blog_enabled setting remains the stored compatibility name for WordPress comment protection. Both protections default off. The explicit cutover pause covers all comment targets and remains paused until the deployment operation verifies and resumes protection. WPForms and storefront workflows remain separate. Normal administrators and authenticated core moderator replies retain their exemptions.
+
 Version **0.2.0** also provides opt-in blog-comment and WooCommerce-review protection. Both start disabled, require a verified Enterprise SCORE key, and leave WPForms settings unchanged. See [configuration and testing](docs/COMMENT-PROTECTION.md) and the [Gloves migration and rollback plan](docs/GLOVES-MIGRATION.md). Production enablement is separately gated.
 
 ## What this plugin does
