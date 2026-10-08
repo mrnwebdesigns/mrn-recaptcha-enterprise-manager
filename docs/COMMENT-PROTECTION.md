@@ -104,3 +104,37 @@ Inventory exact versions, active theme, native comment/review forms, custom subm
 - [Google key metadata](https://docs.cloud.google.com/recaptcha/docs/reference/rest/v1/projects.keys)
 - WordPress 7.1.2 `wp-includes/comment.php` and core REST comments controller, inspected locally.
 - WooCommerce 11.1.0 `includes/class-wc-comments.php` and native review template, inspected locally.
+
+### Sites without WooCommerce or WPForms
+
+Neither plugin is a dependency of WordPress comment protection. Qualify the
+exact installed CAPTCHA ZIP in a separate WordPress database with both plugins
+absent. The reproducible runner checks package/runtime parity and every packaged
+asset checksum, then runs native PHP submission/REST checks, desktop/mobile axe
+scans, real browser submission, multiple forms, provider failure and
+JavaScript-disabled rejection. It also checks the native settings screens,
+subscriber/admin behavior, moderation, explicit cutover pause and emergency
+disable. The review switch remains inert on `product` objects without
+WooCommerce; it does not turn them into protected WooCommerce reviews.
+
+Use the pinned WordPress 7.1.2 and SQLite Database Integration 3.0.2 archives.
+Supply the approved package checksum and a new report directory; the runner
+refuses a checksum mismatch or occupied loopback port and removes its runtime
+on exit. `--mrn-qa` adds the full plugin release suite against that same runtime.
+
+```bash
+NODE_PATH=/Users/khofmeyer/Development/MRN-qa-engine/node_modules \
+python3 tests/run-no-commerce.py \
+  --wordpress /absolute/wordpress-7.1.2.zip \
+  --sqlite /absolute/sqlite-database-integration.3.0.2.zip \
+  --package /absolute/mrn-recaptcha-enterprise-manager-0.2.2.zip \
+  --package-sha256 <approved-sha256> \
+  --reports /absolute/new-qualification-directory --mrn-qa
+```
+
+Google OAuth, key metadata and assessments are intercepted, and outbound mail
+is blocked. This proves optional-plugin independence and the local integration
+contract. Genuine Google browser tokens, exact hosted immutable-asset retention
+and site-specific consent/cache behavior still require their separate approved
+qualification before enabling protection remotely. These tests do not advance
+the retained Fleet default or remove any site's legacy protection.
