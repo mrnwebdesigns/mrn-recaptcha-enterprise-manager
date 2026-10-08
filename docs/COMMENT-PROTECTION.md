@@ -132,6 +132,15 @@ python3 tests/run-no-commerce.py \
   --reports /absolute/new-qualification-directory --mrn-qa
 ```
 
+Repeat with the exact default WPForms package by adding `--wpforms
+/absolute/wpforms.zip --wpforms-sha256 <approved-sha256>` and another new report
+directory. WooCommerce remains absent. This scenario preserves the existing
+WPForms global keys/settings, creates and saves a native form, renders it beside
+comments with WordPress's normal footer hooks, and verifies both Google API
+namespaces remain independent. Desktop/mobile mixed-form accessibility is also
+checked. The accepted Stack package is WPForms 1.10.2.1; later vendor versions
+require their own exact-package qualification.
+
 Google OAuth, key metadata and assessments are intercepted, and outbound mail
 is blocked. This proves optional-plugin independence and the local integration
 contract. Genuine Google browser tokens, exact hosted immutable-asset retention

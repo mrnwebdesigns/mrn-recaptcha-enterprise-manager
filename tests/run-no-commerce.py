@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify an exact ZIP in disposable WordPress; no WooCommerce or WPForms."""
+"""Qualify an exact ZIP without WooCommerce; WPForms is optional and pinned."""
 import argparse
 import hashlib
 import json
@@ -21,9 +21,13 @@ parser.add_argument('--wordpress', type=Path, required=True)
 parser.add_argument('--sqlite', type=Path, required=True)
 parser.add_argument('--package', type=Path, required=True)
 parser.add_argument('--package-sha256', required=True)
+parser.add_argument('--wpforms', type=Path, help='Optional exact WPForms ZIP; WooCommerce is still absent')
+parser.add_argument('--wpforms-sha256')
 parser.add_argument('--reports', type=Path, required=True)
 parser.add_argument('--mrn-qa', action='store_true', help='Run release MRN QA while the disposable runtime is available')
 args = parser.parse_args()
+if bool(args.wpforms) != bool(args.wpforms_sha256):
+    parser.error('--wpforms and --wpforms-sha256 must be provided together')
 
 
 def digest(path):
@@ -59,6 +63,8 @@ with tempfile.TemporaryDirectory(prefix='mrn-recaptcha-no-commerce-') as tempora
     public = root / 'wordpress'
     content = public / 'wp-content'
     extract(args.package, args.package_sha256, content / 'plugins')
+    if args.wpforms:
+        extract(args.wpforms, args.wpforms_sha256, content / 'plugins')
     plugin = content / 'plugins/mrn-recaptcha-enterprise-manager'
     # The runtime bytes must be this task's unchanged accepted production code.
     for path in [plugin / 'mrn-recaptcha-enterprise-manager.php', *plugin.joinpath('includes').rglob('*.php')]:
@@ -84,7 +90,8 @@ $table_prefix='fixture_';if(!defined('ABSPATH'))define('ABSPATH',__DIR__.'/');re
 """.replace('REPORT_LOG', literal(args.reports / 'runtime.log'))
     (public / 'wp-config.php').write_text(config)
     (public / '.mrn-recaptcha-fixture').touch()
-    environment = dict(os.environ, MRN_RECAPTCHA_TEST_ROOT=str(public), MRN_RECAPTCHA_REPORT_DIR=str(args.reports))
+    environment = dict(os.environ, MRN_RECAPTCHA_TEST_ROOT=str(public), MRN_RECAPTCHA_REPORT_DIR=str(args.reports),
+                       MRN_RECAPTCHA_WPFORMS_EXPECTED='1' if args.wpforms else '0')
 
     def php(body, installing=False):
         program = '<?php\n' + ("define('WP_INSTALLING',true);\n" if installing else '') + 'require ' + literal(public / 'wp-load.php') + ';\n' + body
@@ -99,6 +106,8 @@ $table_prefix='fixture_';if(!defined('ABSPATH'))define('ABSPATH',__DIR__.'/');re
     shutil.copy(TESTS / 'fixtures/local-only.php', mu / 'fixture.php')
     (mu / 'post-types.php').write_text("<?php add_action('init',static function(){register_post_type('mrn_fixture',['public'=>true,'supports'=>['title','editor','comments'],'show_in_rest'=>true]);register_post_type('product',['public'=>true,'supports'=>['title','comments']]);});")
     php("require_once ABSPATH.'wp-admin/includes/plugin.php';$error=activate_plugin('mrn-recaptcha-enterprise-manager/mrn-recaptcha-enterprise-manager.php');if(is_wp_error($error))throw new RuntimeException($error->get_error_code());")
+    if args.wpforms:
+        php("require_once ABSPATH.'wp-admin/includes/plugin.php';$error=activate_plugin('wpforms/wpforms.php');if(is_wp_error($error))throw new RuntimeException($error->get_error_code());")
     with (args.reports / 'integration.log').open('w') as log:
         result = subprocess.run(['php', str(TESTS / 'integration-no-commerce.php')], stdout=log, stderr=subprocess.STDOUT, env=environment, timeout=120)
         if result.returncode:
@@ -139,7 +148,8 @@ $table_prefix='fixture_';if(!defined('ABSPATH'))define('ABSPATH',__DIR__.'/');re
     if debug.exists() and debug.read_text().strip():
         raise RuntimeError('Runtime warnings/errors block qualification; inspect runtime.log')
     receipt = {'status': 'pass', 'wordpress': '7.1.2', 'sqlite': '3.0.2', 'package': args.package.name, 'package_sha256': args.package_sha256,
-               'source_commit': manifest['source_commit'], 'woocommerce_installed': False, 'wpforms_installed': False,
+               'source_commit': manifest['source_commit'], 'woocommerce_installed': False, 'wpforms_installed': bool(args.wpforms),
+               'wpforms_package_sha256': args.wpforms_sha256,
                'runtime': BASE, 'external_provider': 'mocked; genuine Google qualification remains pending',
                'outbound_mail': 'intercepted', 'fixture_destroyed_on_exit': True}
     (args.reports / 'qualification.json').write_text(json.dumps(receipt, indent=2) + '\n')

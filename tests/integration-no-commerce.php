@@ -31,16 +31,28 @@ function no_commerce_count() {
 	return (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->comments" );
 }
 check_no_commerce( ! class_exists( 'WooCommerce' ) && ! function_exists( 'wc_get_product' ) && ! defined( 'WC_VERSION' ), 'WooCommerce classes, functions and constants are absent' );
-check_no_commerce( ! function_exists( 'wpforms' ) && ! defined( 'WPFORMS_VERSION' ), 'WPForms is absent' );
-check_no_commerce( array( 'mrn-recaptcha-enterprise-manager/mrn-recaptcha-enterprise-manager.php' ) === get_option( 'active_plugins' ), 'Only the exact CAPTCHA package is active' );
+$with_wpforms = '1' === getenv( 'MRN_RECAPTCHA_WPFORMS_EXPECTED' );
+check_no_commerce( $with_wpforms === ( function_exists( 'wpforms' ) && defined( 'WPFORMS_VERSION' ) ), 'WPForms presence matches the explicit fixture scenario' );
+$expected_plugins = array( 'mrn-recaptcha-enterprise-manager/mrn-recaptcha-enterprise-manager.php' );
+if ( $with_wpforms ) {
+	$expected_plugins[] = 'wpforms/wpforms.php';
+}
+$active_plugins = get_option( 'active_plugins' );
+sort( $active_plugins );
+check_no_commerce( $expected_plugins === $active_plugins, 'Only the exact scenario packages are active' );
 wp_set_current_user( 1 );
+$wpforms_before = false;
+if ( $with_wpforms ) {
+	$wpforms_before = array( 'captcha-provider' => 'recaptcha', 'recaptcha-type' => 'v3', 'recaptcha-site-key' => 'fixture-existing-site-key', 'recaptcha-secret-key' => 'fixture-existing-legacy-secret', 'fixture-preserve' => 'keep' );
+	update_option( 'wpforms_settings', $wpforms_before );
+}
 ob_start();
 MRN_Recaptcha_Enterprise_Manager::render_settings_page();
 MRN_Recaptcha_Comments::render_settings();
 $admin_html = ob_get_clean();
 check_no_commerce( false !== strpos( $admin_html, 'Comment and review reCAPTCHA' ), 'Both native settings screens render without optional dependencies' );
-$missing_wpforms = MRN_Recaptcha_Enterprise_Manager::bootstrap_wpforms_recaptcha();
-check_no_commerce( is_wp_error( $missing_wpforms ) && 'mrn_recaptcha_wpforms_missing' === $missing_wpforms->get_error_code(), 'WPForms provisioning reports missing dependency without creating a key' );
+$wpforms_bootstrap = MRN_Recaptcha_Enterprise_Manager::bootstrap_wpforms_recaptcha();
+check_no_commerce( $with_wpforms ? ( ! is_wp_error( $wpforms_bootstrap ) && 'unchanged' === $wpforms_bootstrap['status'] ) : ( is_wp_error( $wpforms_bootstrap ) && 'mrn_recaptcha_wpforms_missing' === $wpforms_bootstrap->get_error_code() ), 'WPForms bootstrap handles the actual optional dependency without WooCommerce' );
 update_option( 'comment_moderation', '1' );
 register_post_type( 'mrn_fixture', array( 'public' => true, 'supports' => array( 'title', 'editor', 'comments' ), 'show_in_rest' => true ) );
 register_post_type( 'product', array( 'public' => true, 'supports' => array( 'title', 'comments' ) ) );
@@ -50,6 +62,13 @@ foreach ( array( 'post' => 'post', 'page' => 'page', 'custom' => 'mrn_fixture', 
 }
 $ids['attachment'] = wp_insert_attachment( array( 'post_title' => 'Isolated attachment', 'post_status' => 'inherit', 'post_mime_type' => 'image/png', 'comment_status' => 'open' ), false, $ids['post'] );
 $ids['subscriber'] = wp_insert_user( array( 'user_login' => 'fixture-subscriber', 'user_pass' => wp_generate_password(), 'user_email' => 'subscriber@example.test', 'role' => 'subscriber' ) );
+if ( $with_wpforms ) {
+	$form_data = array( 'fields' => array( 1 => array( 'id' => 1, 'type' => 'text', 'label' => 'Fixture message', 'required' => '1' ) ), 'settings' => array( 'notification_enable' => '0', 'form_class' => '', 'recaptcha' => '1' ) );
+	$ids['wpforms'] = wpforms()->obj( 'form' )->add( 'Isolated non-commerce form', array( 'post_content' => wpforms_encode( $form_data ) ) );
+	check_no_commerce( is_int( $ids['wpforms'] ) && $ids['wpforms'] > 0, 'Real WPForms creates a native form without WooCommerce' );
+	$form_data['id'] = (string) $ids['wpforms'];
+	check_no_commerce( (bool) wpforms()->obj( 'form' )->update( $ids['wpforms'], $form_data ), 'Native WPForms save persists the form identity and settings' );
+}
 update_option( 'fixture_ids', $ids );
 delete_option( MRN_Recaptcha_Comments::OPTION );
 check_no_commerce( ! MRN_Recaptcha_Comments::settings()['blog_enabled'] && ! MRN_Recaptcha_Comments::settings()['reviews_enabled'], 'Fresh activation leaves both protections off' );
@@ -62,7 +81,7 @@ $input = array( 'blog_enabled' => 1, 'reviews_enabled' => 1, 'site_key' => 'fixt
 $settings = MRN_Recaptcha_Comments::sanitize_settings( $input );
 check_no_commerce( ! empty( $settings['verification'] ), 'Setup verifies Enterprise access without either optional plugin' );
 update_option( MRN_Recaptcha_Comments::OPTION, $settings );
-check_no_commerce( false === get_option( 'wpforms_settings', false ), 'Setup does not create absent WPForms settings' );
+check_no_commerce( $wpforms_before === get_option( 'wpforms_settings', false ), 'Comment setup preserves exact optional WPForms settings' );
 wp_set_current_user( 0 );
 $targets = array_intersect_key( $ids, array_flip( array( 'post', 'page', 'attachment', 'custom' ) ) );
 foreach ( $targets as $type => $id ) {
@@ -115,7 +134,7 @@ wp_set_current_user( 1 );
 update_option( MRN_Recaptcha_Comments::PAUSE_OPTION, true );
 wp_set_current_user( 0 );
 foreach ( $ids as $type => $id ) {
-	if ( 'subscriber' === $type ) {
+	if ( in_array( $type, array( 'subscriber', 'wpforms' ), true ) ) {
 		continue;
 	}
 	check_no_commerce( 'mrn_recaptcha_migration_paused' === MRN_Recaptcha_Comments::validate_comment( 0, no_commerce_comment( $id ) )->get_error_code(), $type . ' explicit migration pause works without WooCommerce' );
@@ -132,5 +151,5 @@ update_option( MRN_Recaptcha_Comments::OPTION, $only_review );
 wp_set_current_user( 0 );
 check_no_commerce( 0 === MRN_Recaptcha_Comments::validate_comment( 0, no_commerce_comment( $ids['post'] ) ), 'Review toggle cannot turn on ordinary comment protection' );
 update_option( MRN_Recaptcha_Comments::OPTION, $settings );
-check_no_commerce( false === get_option( 'wpforms_settings', false ), 'All operations preserve absence of WPForms settings' );
+check_no_commerce( $wpforms_before === get_option( 'wpforms_settings', false ), 'All operations preserve exact optional WPForms settings' );
 echo "PASS: $checks non-commerce integration assertions; external HTTP and mail intercepted.\n";
