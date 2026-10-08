@@ -18,7 +18,10 @@ if (!reports) throw new Error('An explicit qualification report directory is req
 		if (url.startsWith(base + '/')) return route.continue();
 		if (url.startsWith('https://www.google.com/recaptcha/enterprise.js')) {
 			enterpriseLoads++;
-			return route.fulfill({contentType: 'application/javascript', body: `window.grecaptcha = {enterprise: {ready: fn => fn(), execute: async () => 'valid:' + crypto.randomUUID()}};`});
+			return route.fulfill({contentType: 'application/javascript', body: `window.grecaptcha = window.grecaptcha || {}; window.grecaptcha.enterprise = {ready: fn => fn(), execute: async () => 'valid:' + crypto.randomUUID()};`});
+		}
+		if (url.startsWith('https://www.google.com/recaptcha/api.js')) {
+			return route.fulfill({contentType: 'application/javascript', body: `window.grecaptcha = window.grecaptcha || {}; window.grecaptcha.ready = fn => fn(); window.grecaptcha.execute = async () => 'wpforms-fixture-token'; const callback = new URL(document.currentScript.src).searchParams.get('onload'); if (callback) { const wait = () => typeof window[callback] === 'function' ? window[callback]() : setTimeout(wait, 10); wait(); }`});
 		}
 		return route.abort();
 	});
@@ -46,6 +49,24 @@ if (!reports) throw new Error('An explicit qualification report directory is req
 	ok(await page.locator('.mrn-recaptcha-comment').count() === 1, 'Authenticated subscriber comment form remains protected');
 	await page.goto(base + '/qa/admin/');
 	ok(await page.locator('.mrn-recaptcha-comment').count() === 0, 'Administrator form remains exempt');
+	if (process.env.MRN_RECAPTCHA_WPFORMS_EXPECTED === '1') {
+		await page.goto(base + '/qa/wpforms/');
+		ok(await page.locator('.wpforms-form').count() === 1, 'Native WPForms form renders alongside ordinary comments without WooCommerce');
+		ok(await page.locator('#commentform .mrn-recaptcha-comment').count() === 1, 'Comments on the WPForms page retain independent protection');
+		writeFileSync(path.join(reports, 'wpforms-page.html'), await page.content());
+		await page.waitForFunction(() => typeof window.grecaptcha?.execute === 'function');
+		for (const width of [1280, 390]) {
+			await page.setViewportSize({width, height: 900});
+			const axe = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+			ok(axe.violations.length === 0, 'Native WPForms and comments pass WCAG A/AA at ' + width);
+		}
+		await page.locator('#comment').fill('Coexistence fixture');
+		await page.locator('#author').fill('Fixture'); await page.locator('#email').fill('fixture@example.test');
+		await page.evaluate(() => document.querySelector('#commentform').addEventListener('submit', event => { event.preventDefault(); window.coexistenceToken = new FormData(event.target).get('mrn_recaptcha_token'); }));
+		await page.locator('#submit').click();
+		await page.waitForFunction(() => !!window.coexistenceToken);
+		ok(await page.evaluate(() => window.coexistenceToken.startsWith('valid:') && typeof window.grecaptcha.execute === 'function' && typeof window.grecaptcha.enterprise.execute === 'function'), 'Comment token generation preserves WPForms legacy Google namespace');
+	}
 	await page.goto(base + '/');
 	await page.locator('#comment').fill('No WooCommerce browser submission ' + Date.now());
 	await page.locator('#author').fill('Fixture');
@@ -99,7 +120,7 @@ if (!reports) throw new Error('An explicit qualification report directory is req
 	await page.locator('#email').fill('fixture@example.test');
 	const [bypass] = await Promise.all([page.waitForNavigation(), page.evaluate(() => HTMLFormElement.prototype.submit.call(document.querySelector('form')))]);
 	ok(bypass.status() === 403, 'Direct form.submit cannot bypass the server check');
-	ok(errors.length === 0, 'No browser JavaScript errors without optional plugins');
+	ok(errors.length === 0, 'No browser JavaScript errors in the selected optional-plugin scenario');
 	await page.screenshot({path: path.join(reports, 'server-rejection.png'), fullPage: true});
 	await context.close();
 	await offline.close();
