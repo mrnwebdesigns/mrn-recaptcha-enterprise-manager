@@ -1,4 +1,34 @@
-# Gloves release readiness work — 2026-10-01
+# CAPTCHA readiness reconciliation — 2026-10-13
+
+The October 6 Gloves pilot completed genuine Google assessments on
+`https://gloves.mrndev.io/` and the protection cutover on
+`https://gloves-online.com/` with the immutable 0.2.2 ZIP SHA-256
+`44e43aad96cc4ac55c671cc29821b8ea1a6c59decb024a24e183444c2e6fc7de`.
+The retained `MRN-sites/gloves/reports/recaptcha-migration-2026-10-06/`
+`dev-genuine-tests-summary.json`, `live-final-runtime-verification.json` and
+`LIVE-CLOSEOUT.md` bind that evidence to its exact runtime and package.
+These are historical receipts, not a fresh health check or authorization.
+
+The live cutover used the qualified operator route and Deployment Agent 0.2.5.
+It did not seed or qualify the new native Dashboard migration controller.
+The Stack default therefore remains 0.1.4. Before lifting it, qualify the
+accepted Operations API and Deployment Agent together through the native
+MainWP route: authenticated status/preflight, denial cases, backup-bound
+prepare/resume/restore, immutable assets and recovery readback. Resolve and
+freshly sync the exact pilot first; an offline child is a blocker.
+
+Version 0.2.3 gives the later accepted qualification and updated distributable
+documentation a new immutable version. Do not replace the prior 0.2.2 ZIP or
+extend its Google trial receipt to a different package hash. Local fixture
+results must identify mocked provider responses separately. Reuse the existing
+IAM/key setup only after current readback; the old proposals below are not a
+request to recreate keys, repeat grants or retire protection on another site.
+
+The following October 1/4 plan is retained as historical context. Its claims
+about open IAM/key/adapter work and installed Gloves versions are superseded by
+the October 6 receipts and the outstanding controller gate above.
+
+## Historical October 1/4 plan
 
 October 4 source reconciliation: the 0.2.0 candidate now also retains the merged 0.1.4 WPForms loader. Both JavaScript assets share one verified immutable manifest. The operational gates below remain open; the Stack default leaves comment/review protection off and does not deactivate Advanced Google reCAPTCHA.
 

@@ -2,7 +2,7 @@
 Contributors: mrnwebdesigns
 Requires at least: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.2
+Stable tag: 0.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,6 +13,10 @@ Creates and manages Google reCAPTCHA Enterprise website keys and synchronizes th
 Provides the MRN Stack's code-locked Google reCAPTCHA Enterprise integration, including idempotent WPForms credential bootstrap for managed deployments.
 
 == Changelog ==
+
+= 0.2.3 =
+* Give the accepted no-WooCommerce qualification and current readiness documentation a new immutable package version; retain the prior 0.2.2 pilot artifact.
+* Reconcile the completed Gloves provider/cutover evidence with the separately pending native MainWP controller trial. Protection behavior and default-off settings are unchanged.
 
 = 0.2.0 =
 * Add independently enabled Enterprise SCORE protection for blog comments and WooCommerce reviews, with verified key configuration, server-side assessment, accessible submission handling, and unchanged WPForms settings.

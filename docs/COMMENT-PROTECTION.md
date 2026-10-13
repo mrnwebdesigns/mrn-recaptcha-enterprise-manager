@@ -1,4 +1,4 @@
-# Comment and review protection — 0.2.2 candidate
+# Comment and review protection — 0.2.3 candidate
 
 This release adds two opt-in protections under **Settings → Comment reCAPTCHA**:
 
