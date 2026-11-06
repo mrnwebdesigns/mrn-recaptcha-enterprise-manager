@@ -4,6 +4,11 @@ The canonical source lives in the independent `mrnwebdesigns/mrn-recaptcha-enter
 
 Create Google reCAPTCHA Enterprise keys directly from WordPress and optionally sync generated keys to WPForms.
 
+Version 0.2.4 extends the default-off form-aware classic-v3 loader to the
+qualified WPForms 2.0.2.2 and 2.0.4 integrations. Earlier supported versions
+remain supported. Token/server validation, keys, thresholds and the near-form
+loading/retry contract are unchanged; unknown versions keep native loading.
+
 Version 0.2.3 retains the 0.2.2 protection behavior and accepted no-WooCommerce qualification under a new immutable package identity. It covers WordPress comments on posts, pages, attachments and other commentable post types, with WooCommerce reviews controlled separately. The existing blog_enabled setting remains the stored compatibility name for WordPress comment protection. Both protections default off. The explicit cutover pause covers all comment targets and remains paused until the deployment operation verifies and resumes protection. WPForms and storefront workflows remain separate. Normal administrators and authenticated core moderator replies retain their exemptions. See the [current provider and controller status](docs/GLOVES-READINESS.md); package qualification does not authorize a site cutover.
 
 Version **0.2.0** also provides opt-in blog-comment and WooCommerce-review protection. Both start disabled, require a verified Enterprise SCORE key, and leave WPForms settings unchanged. See [configuration and testing](docs/COMMENT-PROTECTION.md) and the [Gloves migration and rollback plan](docs/GLOVES-MIGRATION.md). Production enablement is separately gated.

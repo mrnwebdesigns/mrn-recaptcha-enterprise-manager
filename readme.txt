@@ -2,7 +2,7 @@
 Contributors: mrnwebdesigns
 Requires at least: 6.9
 Requires PHP: 7.4
-Stable tag: 0.2.3
+Stable tag: 0.2.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,6 +13,9 @@ Creates and manages Google reCAPTCHA Enterprise website keys and synchronizes th
 Provides the MRN Stack's code-locked Google reCAPTCHA Enterprise integration, including idempotent WPForms credential bootstrap for managed deployments.
 
 == Changelog ==
+
+= 0.2.4 =
+* Qualify the existing default-off form-aware loader for exact WPForms versions 2.0.2.2 and 2.0.4. Keep native loading for unlisted versions and preserve CAPTCHA settings, server validation and notifications.
 
 = 0.2.3 =
 * Give the accepted no-WooCommerce qualification and current readiness documentation a new immutable package version; retain the prior 0.2.2 pilot artifact.
