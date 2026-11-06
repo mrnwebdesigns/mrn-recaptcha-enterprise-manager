@@ -5,8 +5,10 @@ if ( ! $root || ! is_file( $root . '/.mrn-recaptcha-fixture' ) ) { http_response
 $path = parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH );
 if ( is_file( $root . $path ) ) return false;
 if ( 0 === strpos( $path, '/wp-json' ) ) {
-	$_GET['rest_route'] = substr( $path, 8 ) ?: '/';
-	require $root . '/index.php'; return;
+	// Use a real query string so vendor filter_input() sees the native REST route.
+	// A 307 preserves request methods and bodies for the protected comment tests.
+	header( 'Location: /index.php?rest_route=' . rawurlencode( substr( $path, 8 ) ?: '/' ), true, 307 );
+	return;
 }
 require $root . '/wp-load.php';
 if ( ! defined( 'MRN_RECAPTCHA_ISOLATED_TEST' ) || ! MRN_RECAPTCHA_ISOLATED_TEST || wp_get_environment_type() !== 'local' ) exit;
