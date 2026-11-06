@@ -5,6 +5,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class MRN_Recaptcha_Form_Loader {
+	/**
+	 * Vendor integrations covered by the adapter and native frontend checks.
+	 *
+	 * @var string[]
+	 */
+	private const SUPPORTED_WPFORMS_VERSIONS = array( '2.0.1.1', '2.0.2.1', '2.0.2.2', '2.0.4' );
+
 	private static $form_id = 0;
 
 	public static function init() {
@@ -13,7 +20,7 @@ final class MRN_Recaptcha_Form_Loader {
 
 	/** Activate only for one explicitly opted-in, protected form. */
 	public static function prepare( $forms ) {
-		if ( is_admin() || is_customize_preview() || ! defined( 'WPFORMS_VERSION' ) || ! in_array( WPFORMS_VERSION, array( '2.0.1.1', '2.0.2.1' ), true ) || ! is_array( $forms ) || 1 !== count( $forms ) ) {
+		if ( is_admin() || is_customize_preview() || ! defined( 'WPFORMS_VERSION' ) || ! in_array( WPFORMS_VERSION, self::SUPPORTED_WPFORMS_VERSIONS, true ) || ! is_array( $forms ) || 1 !== count( $forms ) ) {
 			return;
 		}
 		$form = reset( $forms );
