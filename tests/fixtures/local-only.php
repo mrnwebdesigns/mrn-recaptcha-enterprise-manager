@@ -5,6 +5,9 @@ if ( ! defined( 'MRN_RECAPTCHA_ISOLATED_TEST' ) || true !== MRN_RECAPTCHA_ISOLAT
 }
 add_filter( 'pre_wp_mail', function () { $GLOBALS['fixture_mail_attempts'] = ( $GLOBALS['fixture_mail_attempts'] ?? 0 ) + 1; return true; }, PHP_INT_MAX );
 add_filter( 'wp_is_application_passwords_available', '__return_false' );
+if ( '1' === getenv( 'MRN_RECAPTCHA_FORM_AWARE_EXPECTED' ) ) {
+	add_filter( 'mrn_recaptcha_form_aware_loading', '__return_true' );
+}
 // Keep repeated synthetic cases independent of core's flood timer.
 add_filter( 'wp_is_comment_flood', '__return_false', PHP_INT_MAX );
 $fixture_key = openssl_pkey_new( array( 'private_key_bits' => 2048 ) );

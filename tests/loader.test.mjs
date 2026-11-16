@@ -5,14 +5,18 @@ import {readFileSync} from 'node:fs';
 const source = readFileSync(new URL('../assets/wpforms-form-loader.js', import.meta.url), 'utf8');
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
-function fixture({observer = true, existing = false} = {}) {
-  const state = {scripts: [], calls: [], events: [], timers: new Map(), restored: 0, handlers: {}};
+function fixture({observer = true, existing = false, helpUrl = ''} = {}) {
+  const state = {scripts: [], calls: [], events: [], timers: new Map(), restored: 0, handlers: {}, requestSubmits: 0};
   const token = {value: 'stale'};
+  const submitContainer = {};
+  const submit = {click: () => state.submitClicks++};
   const form = {isConnected: true, error: null, addEventListener: (n, cb) => state.handlers[n] = cb,
-    querySelector: () => form.error, querySelectorAll: () => [token],
-    appendChild: el => { form.error = el; el.remove = () => form.error = null; }};
+    querySelector: selector => selector === '.mrn-recaptcha-load-error' ? form.error : selector === '.wpforms-submit-container' ? submitContainer : selector === '[type="submit"]' ? submit : null,
+    querySelectorAll: () => [token], requestSubmit: () => state.requestSubmits++,
+    appendChild: el => { form.error = el; el.remove = () => form.error = null; },
+    insertBefore: (el, target) => { assert.equal(target, submitContainer); form.appendChild(el); state.errorBeforeSubmit = true; }};
   const document = {getElementById: id => id === 'wpforms-recaptcha-js' ? {nonce: 'test-nonce'} : form,
-    createElement: () => ({setAttribute(k, v) { this[k] = v; }, remove() { this.removed = true; }}),
+    createElement: () => ({children: [], setAttribute(k, v) { this[k] = v; }, appendChild(child) { this.children.push(child); }, addEventListener(n, cb) { this.handlers = this.handlers || {}; this.handlers[n] = cb; }, remove() { this.removed = true; }}),
     head: {appendChild: el => state.scripts.push(el)}, dispatchEvent: e => state.events.push(e.type)};
   let serial = 0;
   const window = {setTimeout: cb => {state.timers.set(++serial, cb); return serial;}, clearTimeout: id => state.timers.delete(id),
@@ -21,7 +25,7 @@ function fixture({observer = true, existing = false} = {}) {
   const api = {ready: cb => cb(), execute: (key, options) => {state.calls.push({key, options}); return Promise.resolve('fresh-' + state.calls.length);}};
   if (existing) window.grecaptcha = api;
   vm.runInNewContext(source, {window, document, CustomEvent: class {constructor(type) {this.type = type;}}});
-  window.mrnRecaptchaFormLoader.init({formId: 68, siteKey: 'public-test-key', api: 'https://www.google.com/recaptcha/api.js?render=public-test-key', error: 'Please retry'});
+  window.mrnRecaptchaFormLoader.init({formId: 68, siteKey: 'public-test-key', api: 'https://www.google.com/recaptcha/api.js?render=public-test-key', error: 'Please retry', helpUrl, helpText: 'Get help another way'});
   return {state, token, form, window, api, complete: async () => {window.grecaptcha = api; state.scripts.at(-1)?.onload(); await flush();}};
 }
 
@@ -54,9 +58,18 @@ test('API failure blocks continuation, clears stale tokens, restores button, and
   f.window.wpformsRecaptchaV3Execute(() => submitted++);
   f.state.scripts[0].onerror(); await flush();
   assert.equal(submitted, 0); assert.equal(f.token.value, '');
-  assert.equal(f.form.error.role, 'alert'); assert.equal(f.state.restored, 1);
+  assert.equal(f.form.error.role, 'alert'); assert.equal(f.form.error['aria-live'], 'assertive'); assert.equal(f.state.errorBeforeSubmit, true); assert.equal(f.state.restored, 1);
+  const retry = f.form.error.children[1]; retry.handlers.click(); assert.equal(f.state.requestSubmits, 1, 'retry re-enters native form validation');
   f.window.wpformsRecaptchaV3Execute(() => submitted++); await f.complete();
   assert.equal(submitted, 1); assert.equal(f.form.error, null);
+});
+
+test('failure offers a site-owned alternate contact route only when configured', async () => {
+  const f = fixture({existing: true, helpUrl: 'tel:+15551234567'});
+  f.api.execute = () => Promise.resolve('');
+  f.window.wpformsRecaptchaV3Execute(() => assert.fail('empty token must not continue')); await flush();
+  const help = f.form.error.children[2];
+  assert.equal(help.href, 'tel:+15551234567'); assert.equal(help.textContent, 'Get help another way');
 });
 
 test('load timeout and late arrival cannot submit a timed-out attempt', async () => {

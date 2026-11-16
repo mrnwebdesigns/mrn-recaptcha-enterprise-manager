@@ -52,8 +52,11 @@ if (!reports) throw new Error('An explicit qualification report directory is req
 	if (process.env.MRN_RECAPTCHA_WPFORMS_EXPECTED === '1') {
 		await page.goto(base + '/qa/wpforms/');
 		ok(await page.locator('.wpforms-form').count() === 1, 'Native WPForms form renders alongside ordinary comments without WooCommerce');
+		const formAware = process.env.MRN_RECAPTCHA_FORM_AWARE_EXPECTED === '1';
+		ok((await page.locator('#wpforms-recaptcha-js').getAttribute('src')).includes('assets/generated/wpforms-form-loader.') === formAware, 'Native WordPress footer uses the expected CAPTCHA loading contract');
 		ok(await page.locator('#commentform .mrn-recaptcha-comment').count() === 1, 'Comments on the WPForms page retain independent protection');
 		writeFileSync(path.join(reports, 'wpforms-page.html'), await page.content());
+		await page.locator('.wpforms-form input:not([type="hidden"])').first().focus();
 		await page.waitForFunction(() => typeof window.grecaptcha?.execute === 'function');
 		for (const width of [1280, 390]) {
 			await page.setViewportSize({width, height: 900});

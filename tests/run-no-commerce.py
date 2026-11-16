@@ -23,11 +23,14 @@ parser.add_argument('--package', type=Path, required=True)
 parser.add_argument('--package-sha256', required=True)
 parser.add_argument('--wpforms', type=Path, help='Optional exact WPForms ZIP; WooCommerce is still absent')
 parser.add_argument('--wpforms-sha256')
+parser.add_argument('--form-aware', action='store_true', help='Qualify the opt-in WPForms adapter in the isolated runtime')
 parser.add_argument('--reports', type=Path, required=True)
 parser.add_argument('--mrn-qa', action='store_true', help='Run release MRN QA while the disposable runtime is available')
 args = parser.parse_args()
 if bool(args.wpforms) != bool(args.wpforms_sha256):
     parser.error('--wpforms and --wpforms-sha256 must be provided together')
+if args.form_aware and not args.wpforms:
+    parser.error('--form-aware requires an exact WPForms package')
 
 
 def digest(path):
@@ -91,7 +94,8 @@ $table_prefix='fixture_';if(!defined('ABSPATH'))define('ABSPATH',__DIR__.'/');re
     (public / 'wp-config.php').write_text(config)
     (public / '.mrn-recaptcha-fixture').touch()
     environment = dict(os.environ, MRN_RECAPTCHA_TEST_ROOT=str(public), MRN_RECAPTCHA_REPORT_DIR=str(args.reports),
-                       MRN_RECAPTCHA_WPFORMS_EXPECTED='1' if args.wpforms else '0')
+                       MRN_RECAPTCHA_WPFORMS_EXPECTED='1' if args.wpforms else '0',
+                       MRN_RECAPTCHA_FORM_AWARE_EXPECTED='1' if args.form_aware else '0')
 
     def php(body, installing=False):
         program = '<?php\n' + ("define('WP_INSTALLING',true);\n" if installing else '') + 'require ' + literal(public / 'wp-load.php') + ';\n' + body
@@ -149,6 +153,7 @@ $table_prefix='fixture_';if(!defined('ABSPATH'))define('ABSPATH',__DIR__.'/');re
         raise RuntimeError('Runtime warnings/errors block qualification; inspect runtime.log')
     receipt = {'status': 'pass', 'wordpress': '7.1.2', 'sqlite': '3.0.2', 'package': args.package.name, 'package_sha256': args.package_sha256,
                'source_commit': manifest['source_commit'], 'woocommerce_installed': False, 'wpforms_installed': bool(args.wpforms),
+               'form_aware_enabled': args.form_aware,
                'wpforms_package_sha256': args.wpforms_sha256,
                'runtime': BASE, 'external_provider': 'mocked; genuine Google qualification remains pending',
                'outbound_mail': 'intercepted', 'fixture_destroyed_on_exit': True}

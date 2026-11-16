@@ -5,13 +5,14 @@ define( 'WPFORMS_VERSION', $argv[1] ?? '2.0.2.1' );
 define( 'MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR', dirname( __DIR__ ) . '/' );
 define( 'MRN_RECAPTCHA_ENTERPRISE_MANAGER_FILE', dirname( __DIR__ ) . '/mrn-recaptcha-enterprise-manager.php' );
 $flags = array( 'admin' => false, 'preview' => false, 'optin' => true );
+$filter_values = array();
 $settings = array( 'provider' => 'recaptcha', 'recaptcha_type' => 'v3', 'site_key' => 'public-key' );
 $scripts = (object) array( 'registered' => array() );
 $hooks = array();
 function is_admin() { global $flags; return $flags['admin']; }
 function is_customize_preview() { global $flags; return $flags['preview']; }
 function absint( $n ) { return abs( (int) $n ); }
-function apply_filters( $name, $value, ...$args ) { global $flags; return $flags['optin']; }
+function apply_filters( $name, $value, ...$args ) { global $flags, $filter_values; return 'mrn_recaptcha_form_aware_loading' === $name ? $flags['optin'] : ( $filter_values[ $name ] ?? $value ); }
 function add_action( ...$args ) {}
 function add_filter( ...$args ) { global $hooks; $hooks[] = $args; }
 function wp_scripts() { global $scripts; return $scripts; }
@@ -30,7 +31,7 @@ $flags['optin'] = false; MRN_Recaptcha_Form_Loader::prepare( array( $form ) ); c
 MRN_Recaptcha_Form_Loader::prepare( array( $form, $form ) ); check( ! $hooks, 'multiple forms keep vendor integration' );
 MRN_Recaptcha_Form_Loader::prepare( array( array( 'id' => 68 ) ) ); check( ! $hooks, 'unprotected form unchanged' );
 MRN_Recaptcha_Form_Loader::prepare( array( $form ) );
-if ( ! in_array( WPFORMS_VERSION, array( '2.0.1.1', '2.0.2.1' ), true ) ) { check( ! $hooks, 'unqualified vendor version unchanged' ); exit; }
+if ( ! in_array( WPFORMS_VERSION, array( '2.0.1.1', '2.0.2.1', '2.0.2.2', '2.0.4' ), true ) ) { check( ! $hooks, 'unqualified vendor version unchanged' ); exit; }
 check( count( $hooks ) === 1, 'qualified form enables adapter' );
 $native = 'var wpformsRecaptchaV3Execute = function () {}; /* wpformsRecaptchaLoaded */';
 foreach ( array( 'turnstile', 'hcaptcha' ) as $provider ) {
@@ -49,3 +50,19 @@ check( str_starts_with( $adapted, 'window.mrnRecaptchaFormLoader.init(' ), 'qual
 check( str_contains( $scripts->registered['wpforms-recaptcha']->src, 'assets/generated/wpforms-form-loader.' ), 'immutable local URL' );
 check( in_array( 'jquery', $scripts->registered['wpforms-recaptcha']->deps, true ), 'recovery dependency retained' );
 check( str_contains( $adapted, '"formId":68' ), 'exact form identity' );
+$filter_values['mrn_recaptcha_form_aware_api_host'] = 'www.recaptcha.net';
+$scripts->registered['wpforms-recaptcha']->src = 'https://www.google.com/recaptcha/api.js?render=public-key';
+$adapted = MRN_Recaptcha_Form_Loader::adapt( $native );
+check( str_contains( $adapted, 'www.recaptcha.net' ), 'official alternate API host is allowed' );
+$filter_values['mrn_recaptcha_form_aware_api_host'] = 'untrusted.example';
+$scripts->registered['wpforms-recaptcha']->src = 'https://www.google.com/recaptcha/api.js?render=public-key';
+$adapted = MRN_Recaptcha_Form_Loader::adapt( $native );
+check( str_contains( $adapted, 'www.google.com' ), 'untrusted API host falls back to Google' );
+$filter_values['mrn_recaptcha_form_aware_help_url'] = 'tel:+15551234567';
+$scripts->registered['wpforms-recaptcha']->src = 'https://www.google.com/recaptcha/api.js?render=public-key';
+$adapted = MRN_Recaptcha_Form_Loader::adapt( $native );
+check( str_contains( $adapted, 'tel:+15551234567' ), 'alternate contact route is passed to the loader' );
+$filter_values['mrn_recaptcha_form_aware_help_url'] = 'javascript:alert(1)';
+$scripts->registered['wpforms-recaptcha']->src = 'https://www.google.com/recaptcha/api.js?render=public-key';
+$adapted = MRN_Recaptcha_Form_Loader::adapt( $native );
+check( str_contains( $adapted, '"helpUrl":""' ), 'unsafe alternate contact route is rejected' );
