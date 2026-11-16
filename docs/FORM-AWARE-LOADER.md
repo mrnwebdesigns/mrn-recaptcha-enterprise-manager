@@ -16,7 +16,34 @@ validated submission, and continues through WPForms' native submission path.
 It does not change CAPTCHA settings, secrets, server verification, score
 thresholds, or form notifications. Loading and token execution have 15-second
 failure bounds. Failure clears the token, restores the submit button, and
-announces a retry message; it never proceeds without a nonempty token.
+announces a retry message with an explicit retry control; it never proceeds
+without a nonempty token. The error is inserted immediately before the submit
+controls and does not alter field validation state.
+
+## Availability configuration
+
+The default browser API host is `www.google.com`. A site may select the only
+other supported official host when Google is unavailable to its visitors:
+
+```php
+add_filter( 'mrn_recaptcha_form_aware_api_host', static function( $host, $form_id ) {
+    return 687 === $form_id ? 'www.recaptcha.net' : $host;
+}, 10, 2 );
+```
+
+The host is allowlisted; arbitrary hosts are rejected. The site must also allow
+the selected host and its required Google resources in CSP before enabling it.
+This is not an automatic bypass for blockers and does not permit submission
+without a valid server-verified token.
+
+Optionally add a site-owned fallback contact route to the failure UI. Only
+`https`, `mailto`, and `tel` URLs are accepted:
+
+```php
+add_filter( 'mrn_recaptcha_form_aware_help_url', static function( $url, $form_id ) {
+    return 687 === $form_id ? 'tel:+19193241563' : $url;
+}, 10, 2 );
+```
 
 Google recommends early loading for more behavioral context. Starting near the
 form preserves more context than submission-only loading but does not prove

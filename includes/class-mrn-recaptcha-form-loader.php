@@ -14,6 +14,9 @@ final class MRN_Recaptcha_Form_Loader {
 
 	private static $form_id = 0;
 
+	/** Only official reCAPTCHA frontend origins may be selected by a site. */
+	private const API_HOSTS = array( 'www.google.com', 'www.recaptcha.net' );
+
 	public static function init() {
 		add_action( 'wpforms_wp_footer', array( __CLASS__, 'prepare' ), 1 );
 	}
@@ -42,10 +45,13 @@ final class MRN_Recaptcha_Form_Loader {
 		if ( 'recaptcha' !== ( $settings['provider'] ?? '' ) || 'v3' !== ( $settings['recaptcha_type'] ?? '' ) || empty( $settings['site_key'] ) ) {
 			return $inline;
 		}
-		$api = 'https://www.google.com/recaptcha/api.js?render=' . $settings['site_key'];
-		if ( $api !== $script->src || false === strpos( $inline, 'var wpformsRecaptchaV3Execute = function' ) || false === strpos( $inline, 'wpformsRecaptchaLoaded' ) ) {
+		$native_api = 'https://www.google.com/recaptcha/api.js?render=' . $settings['site_key'];
+		if ( $native_api !== $script->src || false === strpos( $inline, 'var wpformsRecaptchaV3Execute = function' ) || false === strpos( $inline, 'wpformsRecaptchaLoaded' ) ) {
 			return $inline;
 		}
+		$host = apply_filters( 'mrn_recaptcha_form_aware_api_host', 'www.google.com', self::$form_id );
+		$host = is_string( $host ) && in_array( $host, self::API_HOSTS, true ) ? $host : 'www.google.com';
+		$api  = 'https://' . $host . '/recaptcha/api.js?render=' . $settings['site_key'];
 		$manifest_file = MRN_RECAPTCHA_ENTERPRISE_MANAGER_DIR . 'assets/manifest.json';
 		if ( ! is_readable( $manifest_file ) ) {
 			return $inline;
@@ -61,9 +67,24 @@ final class MRN_Recaptcha_Form_Loader {
 			'siteKey' => $settings['site_key'],
 			'formId'  => self::$form_id,
 			'error'   => __( 'Spam protection could not load. Please check your connection and try submitting again.', 'mrn-recaptcha-enterprise-manager' ),
+			'helpUrl' => self::get_help_url(),
+			'helpText' => __( 'Use another contact method', 'mrn-recaptcha-enterprise-manager' ),
 		);
 		$script->src    = plugins_url( $path, MRN_RECAPTCHA_ENTERPRISE_MANAGER_FILE );
 		$script->deps[] = 'jquery';
 		return 'window.mrnRecaptchaFormLoader.init(' . wp_json_encode( $config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ) . ');';
+	}
+
+	/**
+	 * Site-owned fallback destination. Keep the plugin neutral unless a site opts in.
+	 *
+	 * @return string
+	 */
+	private static function get_help_url() {
+		$url = apply_filters( 'mrn_recaptcha_form_aware_help_url', '', self::$form_id );
+		if ( ! is_string( $url ) || ! preg_match( '#^(?:https://|mailto:|tel:)#i', $url ) ) {
+			return '';
+		}
+		return $url;
 	}
 }

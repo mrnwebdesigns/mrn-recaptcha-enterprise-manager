@@ -58,16 +58,43 @@
 				if (error) { error.remove(); }
 			}
 
+			function retrySubmission() {
+				clearError();
+				if (!form) { return; }
+				if (typeof form.requestSubmit === 'function') { form.requestSubmit(); return; }
+				var submit = form.querySelector('[type="submit"]');
+				if (submit && typeof submit.click === 'function') { submit.click(); }
+			}
+
 			function fail() {
 				pendingSubmit = false;
 				if (!form) { return; }
 				form.querySelectorAll('[name="wpforms[recaptcha]"]').forEach(function (field) { field.value = ''; });
 				clearError();
-				var error = document.createElement('p');
+				var error = document.createElement('div');
 				error.className = 'wpforms-error mrn-recaptcha-load-error';
 				error.setAttribute('role', 'alert');
-				error.textContent = config.error;
-				form.appendChild(error);
+				error.setAttribute('aria-live', 'assertive');
+				error.setAttribute('aria-atomic', 'true');
+				var message = document.createElement('p');
+				message.className = 'mrn-recaptcha-load-error-message';
+				message.textContent = config.error;
+				error.appendChild(message);
+				var retry = document.createElement('button');
+				retry.type = 'button';
+				retry.className = 'mrn-recaptcha-retry';
+				retry.textContent = 'Retry spam protection';
+				retry.addEventListener('click', retrySubmission);
+				error.appendChild(retry);
+				if (config.helpUrl) {
+					var help = document.createElement('a');
+					help.href = config.helpUrl;
+					help.className = 'mrn-recaptcha-help';
+					help.textContent = config.helpText || 'Use another contact method';
+					error.appendChild(help);
+				}
+				var submitContainer = form.querySelector('.wpforms-submit-container');
+				if (submitContainer && typeof form.insertBefore === 'function') { form.insertBefore(error, submitContainer); } else { form.appendChild(error); }
 				if (window.wpforms && typeof window.wpforms.restoreSubmitButton === 'function' && window.jQuery) {
 					var $form = window.jQuery(form);
 					window.wpforms.restoreSubmitButton($form, $form.closest('.wpforms-container'));
